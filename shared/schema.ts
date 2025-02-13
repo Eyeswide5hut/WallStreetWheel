@@ -58,7 +58,7 @@ const basePremiumSchema = z.number().or(z.string()).transform(val =>
 );
 
 const optionLegSchema = z.object({
-  optionType: z.enum(debitOptionTypes.concat(creditOptionTypes)),
+  optionType: z.enum([...debitOptionTypes, ...creditOptionTypes] as const),
   strikePrice: basePremiumSchema,
   premium: basePremiumSchema.refine(val => val > 0, {
     message: "Premium must be a positive number"
@@ -106,11 +106,11 @@ export const insertTradeSchema = createInsertSchema(trades)
       })
     }).transform(({ optionType, value }) => {
       // For debit trades (buying options), make premium negative
-      if (debitOptionTypes.includes(optionType)) {
+      if (debitOptionTypes.includes(optionType as typeof debitOptionTypes[number])) {
         return -value;
       }
       // For credit trades (selling options), keep premium positive
-      if (creditOptionTypes.includes(optionType)) {
+      if (creditOptionTypes.includes(optionType as typeof creditOptionTypes[number])) {
         return value;
       }
       // For spreads, user inputs net debit/credit directly
