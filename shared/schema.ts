@@ -40,6 +40,12 @@ export const optionTypes = [
   ...spreadOptionTypes,
 ] as const;
 
+// Define TypeScript types for option categories
+export type DebitOptionType = typeof debitOptionTypes[number];
+export type CreditOptionType = typeof creditOptionTypes[number];
+export type SpreadOptionType = typeof spreadOptionTypes[number];
+export type OptionType = typeof optionTypes[number];
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -58,7 +64,7 @@ const basePremiumSchema = z.number().or(z.string()).transform(val =>
 );
 
 const optionLegSchema = z.object({
-  optionType: z.enum(debitOptionTypes.concat(creditOptionTypes)),
+  optionType: z.enum([...debitOptionTypes, ...creditOptionTypes] as const),
   strikePrice: basePremiumSchema,
   premium: basePremiumSchema.refine(val => val > 0, {
     message: "Premium must be a positive number"
@@ -106,11 +112,11 @@ export const insertTradeSchema = createInsertSchema(trades)
       })
     }).transform(({ optionType, value }) => {
       // For debit trades (buying options), make premium negative
-      if (debitOptionTypes.includes(optionType)) {
+      if (debitOptionTypes.includes(optionType as DebitOptionType)) {
         return -value;
       }
       // For credit trades (selling options), keep premium positive
-      if (creditOptionTypes.includes(optionType)) {
+      if (creditOptionTypes.includes(optionType as CreditOptionType)) {
         return value;
       }
       // For spreads, user inputs net debit/credit directly

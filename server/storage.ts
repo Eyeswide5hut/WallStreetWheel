@@ -1,4 +1,4 @@
-import { type InsertUser, type User, type Trade, type InsertTrade, users, trades } from "@shared/schema";
+import { type InsertUser, type User, type Trade, type InsertTrade, type UpdateUser, users, trades } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import session from "express-session";
