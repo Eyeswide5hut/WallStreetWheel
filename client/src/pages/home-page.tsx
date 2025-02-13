@@ -18,6 +18,9 @@ export default function HomePage() {
             <Link href="/trade">
               <Button variant="outline">New Trade</Button>
             </Link>
+            <Link href="/profile">
+              <Button variant="outline">Profile Settings</Button>
+            </Link>
             <Button 
               variant="ghost" 
               onClick={() => logoutMutation.mutate()}

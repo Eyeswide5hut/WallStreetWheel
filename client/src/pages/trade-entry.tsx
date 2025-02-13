@@ -57,7 +57,13 @@ export default function TradeEntry() {
 
   const tradeMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await apiRequest("POST", "/api/trades", data);
+      // Convert the form data to match the schema
+      const submissionData = {
+        ...data,
+        strikePrice: data.strikePrice.toString(),
+        premium: data.premium.toString(),
+      };
+      const res = await apiRequest("POST", "/api/trades", submissionData);
       return res.json();
     },
     onSuccess: () => {
@@ -128,14 +134,15 @@ export default function TradeEntry() {
                 <FormField
                   control={form.control}
                   name="quantity"
-                  render={({ field: { onChange, ...field } }) => (
+                  render={({ field: { onChange, value, ...field } }) => (
                     <FormItem>
                       <FormLabel>Quantity</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
                           min="1"
-                          onChange={(e) => onChange(Number(e.target.value))}
+                          value={value}
+                          onChange={(e) => onChange(parseInt(e.target.value, 10))}
                           {...field}
                         />
                       </FormControl>

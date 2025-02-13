@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
+import { type UpdateUser } from "@shared/schema";
 
 const PostgresSessionStore = connectPg(session);
 
@@ -18,6 +19,7 @@ export interface IStorage {
   getTrade(id: number): Promise<Trade | undefined>;
 
   sessionStore: session.Store;
+  updateUser(id: number, data: UpdateUser): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -63,6 +65,15 @@ export class DatabaseStorage implements IStorage {
   async getTrade(id: number): Promise<Trade | undefined> {
     const [trade] = await db.select().from(trades).where(eq(trades.id, id));
     return trade;
+  }
+
+  async updateUser(id: number, data: UpdateUser): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
+    return user;
   }
 }
 

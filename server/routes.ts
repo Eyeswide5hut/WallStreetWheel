@@ -2,11 +2,29 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertTradeSchema } from "@shared/schema";
+import { insertTradeSchema, updateUserSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
+
+  // User profile routes
+  app.patch("/api/user/profile", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const validatedData = updateUserSchema.parse(req.body);
+      const updatedUser = await storage.updateUser(req.user!.id, validatedData);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error('Profile update error:', error);
+      if (error.errors) {
+        res.status(400).json({ error: fromZodError(error).message });
+      } else {
+        res.status(400).json({ error: "Invalid profile data" });
+      }
+    }
+  });
 
   // Trade routes
   app.post("/api/trades", async (req, res) => {
