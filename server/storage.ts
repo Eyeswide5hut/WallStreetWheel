@@ -26,9 +26,13 @@ export class DatabaseStorage implements IStorage {
   readonly sessionStore: session.Store;
 
   constructor() {
-    this.sessionStore = new PostgresSessionStore({ 
-      pool, 
-      createTableIfMissing: true 
+    // Initialize session store with error handling and configuration
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true,
+      tableName: 'session', // Explicitly name the session table
+      schemaName: 'public',
+      pruneSessionInterval: 60 // Prune expired sessions every minute
     });
   }
 
@@ -51,7 +55,7 @@ export class DatabaseStorage implements IStorage {
     const trade = {
       ...insertTrade,
       userId,
-      strikePrice: insertTrade.strikePrice.toString(),
+      strikePrice: insertTrade.strikePrice?.toString(), // Handle optional strikePrice
       premium: insertTrade.premium.toString(),
     };
     const [createdTrade] = await db.insert(trades).values(trade).returning();
