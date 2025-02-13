@@ -48,7 +48,7 @@ export default function TradeEntry() {
     resolver: zodResolver(insertTradeSchema),
     defaultValues: {
       tradeDate: new Date().toISOString().split('T')[0],
-      expirationDate: new Date().toISOString().split('T')[0],
+      expirationDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
       useMargin: false,
       quantity: "1",
       tags: [],
@@ -178,7 +178,7 @@ export default function TradeEntry() {
                     <FormItem>
                       <FormLabel>Trade Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" max={new Date().toISOString().split('T')[0]} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -192,7 +192,7 @@ export default function TradeEntry() {
                     <FormItem>
                       <FormLabel>Expiration Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" min={new Date().toISOString().split('T')[0]} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -204,15 +204,19 @@ export default function TradeEntry() {
                 control={form.control}
                 name="useMargin"
                 render={({ field }) => (
-                  <FormItem className="flex items-center justify-between">
-                    <FormLabel>Use Margin</FormLabel>
+                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Use Margin</FormLabel>
+                      <div className="text-sm text-muted-foreground">
+                        Enable if this trade uses margin
+                      </div>
+                    </div>
                     <FormControl>
                       <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -224,7 +228,11 @@ export default function TradeEntry() {
                   <FormItem>
                     <FormLabel>Notes</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Add any trade notes here..." {...field} />
+                      <Textarea 
+                        placeholder="Add any trade notes here..." 
+                        className="resize-none" 
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

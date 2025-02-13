@@ -54,6 +54,8 @@ export const insertTradeSchema = createInsertSchema(trades)
     strikePrice: z.string().transform((val) => val.toString()),
     premium: z.string().transform((val) => val.toString()),
     quantity: z.string().transform((val) => parseInt(val)),
+    tradeDate: z.string().transform((val) => new Date(val)),
+    expirationDate: z.string().transform((val) => new Date(val)),
   });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
