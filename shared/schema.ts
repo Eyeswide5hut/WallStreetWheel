@@ -45,9 +45,9 @@ export const trades = pgTable("trades", {
   userId: integer("user_id").notNull(),
   underlyingAsset: text("underlying_asset").notNull(),
   optionType: text("option_type").notNull(),
-  strikePrice: text("strike_price").notNull(),
+  strikePrice: decimal("strike_price").notNull(),
   expirationDate: timestamp("expiration_date").notNull(),
-  premium: text("premium").notNull(),
+  premium: decimal("premium").notNull(),
   quantity: integer("quantity").notNull(),
   platform: text("platform"),
   useMargin: boolean("use_margin").default(false),
@@ -67,8 +67,12 @@ export const insertTradeSchema = createInsertSchema(trades)
   })
   .extend({
     optionType: z.enum(optionTypes),
-    strikePrice: z.string().transform((val) => val.toString()),
-    premium: z.string().transform((val) => val.toString()),
+    strikePrice: z.number().or(z.string()).transform(val => 
+      typeof val === 'string' ? parseFloat(val) : val
+    ),
+    premium: z.number().or(z.string()).transform(val => 
+      typeof val === 'string' ? parseFloat(val) : val
+    ),
     quantity: z.number().int().positive(),
     tradeDate: z.string().transform((val) => {
       const date = new Date(val);
