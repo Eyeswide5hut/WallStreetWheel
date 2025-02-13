@@ -49,21 +49,34 @@ export default function ProfileSettings() {
     resolver: zodResolver(updateUserSchema),
     defaultValues: {
       email: user?.email || "",
-      platforms: [],
-      preferences: {
+      platforms: user?.platforms || [],
+      preferences: user?.preferences || {
         theme: "system",
         notifications: {
           email: true,
           web: true,
         },
       },
-      marginEnabled: false,
+      marginEnabled: user?.marginEnabled || false,
+      marginRate: user?.marginRate?.toString() || null,
     },
   });
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: UpdateUser) => {
-      const res = await apiRequest("PATCH", "/api/user/profile", data);
+      const formattedData = {
+        ...data,
+        platforms: data.platforms.map(platform => ({
+          ...platform,
+          feeStructure: {
+            perContract: Number(platform.feeStructure.perContract),
+            base: Number(platform.feeStructure.base),
+            assignment: Number(platform.feeStructure.assignment),
+            exercise: Number(platform.feeStructure.exercise),
+          }
+        }))
+      };
+      const res = await apiRequest("PATCH", "/api/user/profile", formattedData);
       return res.json();
     },
     onSuccess: () => {
@@ -168,7 +181,7 @@ export default function ProfileSettings() {
                                   <SelectContent>
                                     {tradingPlatforms.map((platform) => (
                                       <SelectItem key={platform} value={platform}>
-                                        {platform.split('_').map(word => 
+                                        {platform.split('_').map(word =>
                                           word.charAt(0).toUpperCase() + word.slice(1)
                                         ).join(' ')}
                                       </SelectItem>
@@ -283,7 +296,7 @@ export default function ProfileSettings() {
                             step="0.01"
                             placeholder="Enter your margin rate"
                             value={field.value ?? ""}
-                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                            onChange={(e) => field.onChange(e.target.value ? e.target.value.toString() : null)}
                           />
                         </FormControl>
                         <FormMessage />
