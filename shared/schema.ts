@@ -53,7 +53,7 @@ export const insertTradeSchema = createInsertSchema(trades)
     optionType: z.enum(optionTypes),
     strikePrice: z.string().transform((val) => val.toString()),
     premium: z.string().transform((val) => val.toString()),
-    quantity: z.string().transform((val) => parseInt(val)),
+    quantity: z.number().int().positive(),
     tradeDate: z.string().transform((val) => {
       const date = new Date(val);
       if (isNaN(date.getTime())) throw new Error("Invalid trade date");

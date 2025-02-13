@@ -31,7 +31,7 @@ type FormData = {
   optionType: typeof optionTypes[number];
   strikePrice: string;
   premium: string;
-  quantity: string;
+  quantity: number;
   expirationDate: string;
   tradeDate: string;
   useMargin: boolean;
@@ -50,7 +50,7 @@ export default function TradeEntry() {
       tradeDate: new Date().toISOString().split('T')[0],
       expirationDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
       useMargin: false,
-      quantity: "1",
+      quantity: 1,
       tags: [],
     },
   });
@@ -128,11 +128,16 @@ export default function TradeEntry() {
                 <FormField
                   control={form.control}
                   name="quantity"
-                  render={({ field }) => (
+                  render={({ field: { onChange, ...field } }) => (
                     <FormItem>
                       <FormLabel>Quantity</FormLabel>
                       <FormControl>
-                        <Input type="number" min="1" {...field} />
+                        <Input 
+                          type="number" 
+                          min="1"
+                          onChange={(e) => onChange(Number(e.target.value))}
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
