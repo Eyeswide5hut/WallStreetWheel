@@ -1,72 +1,66 @@
-import { type InsertUser, type User, type Trade, type InsertTrade } from "@shared/schema";
+import { type InsertUser, type User, type Trade, type InsertTrade, users, trades } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
 
-const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   // Trade operations
   createTrade(userId: number, trade: InsertTrade): Promise<Trade>;
   getUserTrades(userId: number): Promise<Trade[]>;
   getTrade(id: number): Promise<Trade | undefined>;
-  
+
   sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private trades: Map<number, Trade>;
-  private currentUserId: number;
-  private currentTradeId: number;
+export class DatabaseStorage implements IStorage {
   readonly sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
-    this.trades = new Map();
-    this.currentUserId = 1;
-    this.currentTradeId = 1;
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
+    this.sessionStore = new PostgresSessionStore({ 
+      pool, 
+      createTableIfMissing: true 
     });
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async createTrade(userId: number, insertTrade: InsertTrade): Promise<Trade> {
-    const id = this.currentTradeId++;
-    const trade: Trade = { ...insertTrade, id, userId };
-    this.trades.set(id, trade);
+    const [trade] = await db.insert(trades).values({
+      ...insertTrade,
+      userId
+    }).returning();
     return trade;
   }
 
   async getUserTrades(userId: number): Promise<Trade[]> {
-    return Array.from(this.trades.values()).filter(
-      (trade) => trade.userId === userId,
-    );
+    return db.select().from(trades).where(eq(trades.userId, userId));
   }
 
   async getTrade(id: number): Promise<Trade | undefined> {
-    return this.trades.get(id);
+    const [trade] = await db.select().from(trades).where(eq(trades.id, id));
+    return trade;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

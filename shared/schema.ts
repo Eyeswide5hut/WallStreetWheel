@@ -7,7 +7,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   email: text("email").notNull(),
-  platform: text("platform"),
+  platform: text("platform").default(null),
   useMargin: boolean("use_margin").default(false),
 });
 
@@ -20,10 +20,10 @@ export const trades = pgTable("trades", {
   expirationDate: timestamp("expiration_date").notNull(),
   premium: decimal("premium").notNull(),
   quantity: integer("quantity").notNull(),
-  platform: text("platform"),
+  platform: text("platform").default(null),
   useMargin: boolean("use_margin").default(false),
-  notes: text("notes"),
-  tags: text("tags").array(),
+  notes: text("notes").default(null),
+  tags: text("tags").array().default([]),
   tradeDate: timestamp("trade_date").notNull(),
 });
 
