@@ -88,10 +88,10 @@ export default function ProfileSettings() {
         name: tradingPlatforms[0],
         enabled: true,
         feeStructure: {
-          perContract: 0,
-          base: 0,
-          assignment: 0,
-          exercise: 0,
+          perContract: 0.0,
+          base: 0.0,
+          assignment: 0.0,
+          exercise: 0.0,
         },
       },
     ]);
@@ -214,7 +214,8 @@ export default function ProfileSettings() {
                                     <Input
                                       type="number"
                                       step="0.01"
-                                      {...field}
+                                      value={field.value ?? 0}
+                                      onChange={(e) => field.onChange(Number(e.target.value))}
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -231,7 +232,8 @@ export default function ProfileSettings() {
                                     <Input
                                       type="number"
                                       step="0.01"
-                                      {...field}
+                                      value={field.value ?? 0}
+                                      onChange={(e) => field.onChange(Number(e.target.value))}
                                     />
                                   </FormControl>
                                   <FormMessage />
