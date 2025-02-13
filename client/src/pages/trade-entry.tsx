@@ -1,6 +1,6 @@
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertTradeSchema, optionTypes } from "@shared/schema";
+import { insertTradeSchema, optionTypes, spreadOptionTypes, debitOptionTypes, creditOptionTypes } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -27,11 +27,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { NavHeader } from "@/components/layout/nav-header";
+import { Plus, Minus } from "lucide-react";
 
 type FormData = {
   underlyingAsset: string;
   optionType: typeof optionTypes[number];
-  strikePrice: string;
+  strikePrice?: string;
   premium: string;
   quantity: number;
   expirationDate: string;
@@ -39,6 +40,21 @@ type FormData = {
   platform?: string;
   notes?: string;
   tags: string[];
+  legs?: Array<{
+    optionType: typeof debitOptionTypes[number] | typeof creditOptionTypes[number];
+    strikePrice: string;
+    premium: string;
+    side: "buy" | "sell";
+    quantity: number;
+  }>;
+};
+
+const defaultLegData = {
+  optionType: debitOptionTypes[0],
+  strikePrice: "",
+  premium: "",
+  side: "buy" as const,
+  quantity: 1,
 };
 
 export default function TradeEntry() {
@@ -50,21 +66,32 @@ export default function TradeEntry() {
     resolver: zodResolver(insertTradeSchema),
     defaultValues: {
       tradeDate: new Date().toISOString().split('T')[0],
-      expirationDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+      expirationDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
       quantity: 1,
       tags: [],
+      legs: [],
     },
+  });
+
+  const { fields: legFields, append: appendLeg, remove: removeLeg } = useFieldArray({
+    control: form.control,
+    name: "legs"
   });
 
   const tradeMutation = useMutation({
     mutationFn: async (data: FormData) => {
       const formattedData = {
         ...data,
-        strikePrice: data.strikePrice.toString(),
+        strikePrice: data.strikePrice?.toString(),
         premium: {
           optionType: data.optionType,
           value: data.premium.toString()
-        }
+        },
+        legs: data.legs?.map(leg => ({
+          ...leg,
+          strikePrice: leg.strikePrice.toString(),
+          premium: leg.premium.toString(),
+        }))
       };
       const res = await apiRequest("POST", "/api/trades", formattedData);
       return res.json();
@@ -98,6 +125,8 @@ export default function TradeEntry() {
   const premium = form.watch("premium");
   const optionType = form.watch("optionType");
 
+  const isMultiLegStrategy = spreadOptionTypes.includes(optionType);
+
   const calculatedFees = selectedPlatform ? 
     calculateFees(selectedPlatform, quantity || 0, premium || "0") : 0;
 
@@ -129,88 +158,220 @@ export default function TradeEntry() {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="optionType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Option Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                <FormField
+                  control={form.control}
+                  name="optionType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Strategy Type</FormLabel>
+                      <Select onValueChange={(value) => {
+                        field.onChange(value);
+                        // Reset legs when changing strategy
+                        form.setValue("legs", []);
+                        if (spreadOptionTypes.includes(value)) {
+                          // Add default legs based on strategy
+                          switch(value) {
+                            case "call_spread":
+                            case "put_spread":
+                              appendLeg(defaultLegData);
+                              appendLeg({...defaultLegData, side: "sell"});
+                              break;
+                            case "iron_condor":
+                              appendLeg(defaultLegData); // Buy put
+                              appendLeg({...defaultLegData, side: "sell"}); // Sell put
+                              appendLeg(defaultLegData); // Buy call
+                              appendLeg({...defaultLegData, side: "sell"}); // Sell call
+                              break;
+                            case "butterfly":
+                              appendLeg(defaultLegData); // Buy 1
+                              appendLeg({...defaultLegData, side: "sell", quantity: 2}); // Sell 2
+                              appendLeg({...defaultLegData}); // Buy 1
+                              break;
+                          }
+                        }
+                      }} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select option type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {optionTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type.split('_').map(word => 
+                                word.charAt(0).toUpperCase() + word.slice(1)
+                              ).join(' ')}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {!isMultiLegStrategy ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="strikePrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Strike Price</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="quantity"
+                        render={({ field: { onChange, value, ...field } }) => (
+                          <FormItem>
+                            <FormLabel>Quantity</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={value}
+                                onChange={(e) => onChange(parseInt(e.target.value, 10))}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="premium"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Premium</FormLabel>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select option type" />
-                            </SelectTrigger>
+                            <Input type="number" step="0.01" {...field} />
                           </FormControl>
-                          <SelectContent>
-                            {optionTypes.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type.split('_').map(word => 
-                                  word.charAt(0).toUpperCase() + word.slice(1)
-                                ).join(' ')}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormDescription>
+                            Enter premium amount per contract. For debit trades (buying options), 
+                            this will be treated as a cost.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium">Option Legs</h3>
+                      <Button
+                        type="button"
+                        onClick={() => appendLeg(defaultLegData)}
+                      >
+                        <Plus className="h-4 w-4" /> Add Leg
+                      </Button>
+                    </div>
 
-                  <FormField
-                    control={form.control}
-                    name="quantity"
-                    render={({ field: { onChange, value, ...field } }) => (
-                      <FormItem>
-                        <FormLabel>Quantity</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={value}
-                            onChange={(e) => onChange(parseInt(e.target.value, 10))}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                    {legFields.map((leg, index) => (
+                      <Card key={leg.id} className="p-4">
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <h4 className="text-sm font-medium">Leg {index + 1}</h4>
+                            {legFields.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeLeg(index)}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="strikePrice"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Strike Price</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name={`legs.${index}.side`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Side</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="buy">Buy</SelectItem>
+                                      <SelectItem value="sell">Sell</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
 
-                  <FormField
-                    control={form.control}
-                    name="premium"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Premium</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Enter premium amount per contract. For debit trades (buying options), 
-                          this will be treated as a cost.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                            <FormField
+                              control={form.control}
+                              name={`legs.${index}.quantity`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Quantity</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      {...field}
+                                      onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name={`legs.${index}.strikePrice`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Strike Price</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" step="0.01" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name={`legs.${index}.premium`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Premium</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" step="0.01" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField

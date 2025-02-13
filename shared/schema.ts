@@ -53,13 +53,26 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+const basePremiumSchema = z.number().or(z.string()).transform(val =>
+  typeof val === 'string' ? parseFloat(val) : val
+);
+
+const optionLegSchema = z.object({
+  optionType: z.enum(debitOptionTypes.concat(creditOptionTypes)),
+  strikePrice: basePremiumSchema,
+  premium: basePremiumSchema.refine(val => val > 0, {
+    message: "Premium must be a positive number"
+  }),
+  side: z.enum(["buy", "sell"]),
+  quantity: z.number().int().positive()
+});
+
 export const trades = pgTable("trades", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   underlyingAsset: text("underlying_asset").notNull(),
   optionType: text("option_type").notNull(),
-  strikePrice: decimal("strike_price").notNull(),
-  expirationDate: timestamp("expiration_date").notNull(),
+  strikePrice: decimal("strike_price"),  // For single-leg trades
   premium: decimal("premium").notNull(),
   quantity: integer("quantity").notNull(),
   platform: text("platform"),
@@ -67,17 +80,15 @@ export const trades = pgTable("trades", {
   notes: text("notes"),
   tags: text("tags").array(),
   tradeDate: timestamp("trade_date").notNull(),
+  expirationDate: timestamp("expiration_date").notNull(),
+  legs: jsonb("legs").default('[]'), // For multi-leg trades
 });
 
-const basePremiumSchema = z.number().or(z.string()).transform(val => 
-  typeof val === 'string' ? parseFloat(val) : val
-);
-
 export const insertUserSchema = createInsertSchema(users)
-  .omit({ 
+  .omit({
     id: true,
     createdAt: true,
-    updatedAt: true 
+    updatedAt: true
   });
 
 export const insertTradeSchema = createInsertSchema(trades)
@@ -87,7 +98,7 @@ export const insertTradeSchema = createInsertSchema(trades)
   })
   .extend({
     optionType: z.enum(optionTypes),
-    strikePrice: basePremiumSchema,
+    strikePrice: basePremiumSchema.optional(),
     premium: z.object({
       optionType: z.enum(optionTypes),
       value: basePremiumSchema.refine(val => val > 0, {
@@ -106,6 +117,7 @@ export const insertTradeSchema = createInsertSchema(trades)
       return value;
     }),
     quantity: z.number().int().positive(),
+    legs: z.array(optionLegSchema).optional(),
     tradeDate: z.string().transform((val) => {
       const date = new Date(val);
       if (isNaN(date.getTime())) throw new Error("Invalid trade date");
@@ -141,11 +153,11 @@ export const platformSettingsSchema = z.object({
 });
 
 export const updateUserSchema = createInsertSchema(users)
-  .omit({ 
-    id: true, 
+  .omit({
+    id: true,
     password: true,
     createdAt: true,
-    updatedAt: true 
+    updatedAt: true
   })
   .extend({
     platforms: z.array(platformSettingsSchema).default([]),
