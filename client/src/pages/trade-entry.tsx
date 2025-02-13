@@ -33,7 +33,7 @@ type FormData = {
   underlyingAsset: string;
   optionType: typeof optionTypes[number];
   strikePrice?: string;
-  premium: string;
+  premium: string; // We'll transform this during submission
   quantity: number;
   expirationDate: string;
   tradeDate: string;
@@ -81,17 +81,22 @@ export default function TradeEntry() {
 
   const tradeMutation = useMutation({
     mutationFn: async (data: FormData) => {
+      const premiumValue = parseFloat(data.premium);
+      if (isNaN(premiumValue)) {
+        throw new Error("Invalid premium value");
+      }
+
       const formattedData = {
         ...data,
         strikePrice: data.strikePrice?.toString(),
         premium: {
           optionType: data.optionType,
-          value: parseFloat(data.premium)
+          value: Math.abs(premiumValue) // Always send positive value, schema handles debit/credit
         },
         legs: data.legs?.map(leg => ({
           ...leg,
-          strikePrice: leg.strikePrice.toString(),
-          premium: parseFloat(leg.premium), //Corrected to parse premium as float for legs
+          strikePrice: parseFloat(leg.strikePrice).toString(),
+          premium: parseFloat(leg.premium)
         }))
       };
       const res = await apiRequest("POST", "/api/trades", formattedData);
