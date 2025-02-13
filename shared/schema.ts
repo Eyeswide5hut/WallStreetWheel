@@ -54,8 +54,16 @@ export const insertTradeSchema = createInsertSchema(trades)
     strikePrice: z.string().transform((val) => val.toString()),
     premium: z.string().transform((val) => val.toString()),
     quantity: z.string().transform((val) => parseInt(val)),
-    tradeDate: z.string().transform((val) => new Date(val)),
-    expirationDate: z.string().transform((val) => new Date(val)),
+    tradeDate: z.string().transform((val) => {
+      const date = new Date(val);
+      if (isNaN(date.getTime())) throw new Error("Invalid trade date");
+      return date;
+    }),
+    expirationDate: z.string().transform((val) => {
+      const date = new Date(val);
+      if (isNaN(date.getTime())) throw new Error("Invalid expiration date");
+      return date;
+    }),
   });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
