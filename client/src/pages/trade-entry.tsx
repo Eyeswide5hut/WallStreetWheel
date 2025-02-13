@@ -58,12 +58,15 @@ export default function TradeEntry() {
 
   const tradeMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const submissionData = {
+      const formattedData = {
         ...data,
         strikePrice: data.strikePrice.toString(),
-        premium: data.premium.toString(),
+        premium: {
+          optionType: data.optionType,
+          value: data.premium.toString()
+        }
       };
-      const res = await apiRequest("POST", "/api/trades", submissionData);
+      const res = await apiRequest("POST", "/api/trades", formattedData);
       return res.json();
     },
     onSuccess: () => {
@@ -80,7 +83,6 @@ export default function TradeEntry() {
     },
   });
 
-  // Calculate fees based on platform settings
   const calculateFees = (platform: string, quantity: number, premium: string) => {
     const platformSettings = user?.platforms?.find(p => p.id === platform);
     if (!platformSettings) return 0;
@@ -94,6 +96,8 @@ export default function TradeEntry() {
   const selectedPlatform = form.watch("platform");
   const quantity = form.watch("quantity");
   const premium = form.watch("premium");
+  const optionType = form.watch("optionType");
+
   const calculatedFees = selectedPlatform ? 
     calculateFees(selectedPlatform, quantity || 0, premium || "0") : 0;
 
@@ -107,7 +111,10 @@ export default function TradeEntry() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit((data) => tradeMutation.mutate(data))} className="space-y-6">
+              <form 
+                onSubmit={form.handleSubmit((data) => tradeMutation.mutate(data))} 
+                className="space-y-6"
+              >
                 <FormField
                   control={form.control}
                   name="underlyingAsset"
@@ -195,6 +202,10 @@ export default function TradeEntry() {
                         <FormControl>
                           <Input type="number" step="0.01" {...field} />
                         </FormControl>
+                        <FormDescription>
+                          Enter premium amount per contract. For debit trades (buying options), 
+                          this will be treated as a cost.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

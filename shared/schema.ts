@@ -69,9 +69,16 @@ export const trades = pgTable("trades", {
   tradeDate: timestamp("trade_date").notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true
-});
+const basePremiumSchema = z.number().or(z.string()).transform(val => 
+  typeof val === 'string' ? parseFloat(val) : val
+);
+
+export const insertUserSchema = createInsertSchema(users)
+  .omit({ 
+    id: true,
+    createdAt: true,
+    updatedAt: true 
+  });
 
 export const insertTradeSchema = createInsertSchema(trades)
   .omit({
@@ -83,31 +90,28 @@ export const insertTradeSchema = createInsertSchema(trades)
     strikePrice: z.number().or(z.string()).transform(val => 
       typeof val === 'string' ? parseFloat(val) : val
     ),
-    premium: z.number().or(z.string()).transform((val, ctx) => {
-      const premium = typeof val === 'string' ? parseFloat(val) : val;
-      const optionType = ctx.parent.optionType;
-
-      // Ensure premium is positive first
-      if (premium <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Premium must be a positive number",
-        });
-        return z.NEVER;
-      }
-
+    premium: z.object({
+      optionType: z.enum(optionTypes),
+      value: z.number().or(z.string()).transform(val => {
+        const value = typeof val === 'string' ? parseFloat(val) : val;
+        if (value <= 0) {
+          throw new Error("Premium must be a positive number");
+        }
+        return value;
+      })
+    }).transform(({ optionType, value }) => {
       // For debit trades (buying options), make premium negative
       if (debitOptionTypes.includes(optionType as typeof debitOptionTypes[number])) {
-        return -premium;
+        return -value;
       }
 
       // For credit trades (selling options), keep premium positive
       if (creditOptionTypes.includes(optionType as typeof creditOptionTypes[number])) {
-        return premium;
+        return value;
       }
 
       // For spreads, user inputs net debit/credit directly
-      return premium;
+      return value;
     }),
     quantity: z.number().int().positive(),
     tradeDate: z.string().transform((val) => {
