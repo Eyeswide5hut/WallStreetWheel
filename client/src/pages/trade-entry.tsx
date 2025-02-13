@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Form,
   FormControl,
@@ -12,11 +13,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -35,22 +36,21 @@ type FormData = {
   quantity: number;
   expirationDate: string;
   tradeDate: string;
-  useMargin: boolean;
-  notes?: string;
   platform?: string;
+  notes?: string;
   tags: string[];
 };
 
 export default function TradeEntry() {
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
+  const { user } = useAuth();
 
   const form = useForm<FormData>({
     resolver: zodResolver(insertTradeSchema),
     defaultValues: {
       tradeDate: new Date().toISOString().split('T')[0],
       expirationDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
-      useMargin: false,
       quantity: 1,
       tags: [],
     },
@@ -58,7 +58,6 @@ export default function TradeEntry() {
 
   const tradeMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      // Convert the form data to match the schema
       const submissionData = {
         ...data,
         strikePrice: data.strikePrice.toString(),
@@ -80,6 +79,23 @@ export default function TradeEntry() {
       });
     },
   });
+
+  // Calculate fees based on platform settings
+  const calculateFees = (platform: string, quantity: number, premium: string) => {
+    const platformSettings = user?.platforms?.find(p => p.id === platform);
+    if (!platformSettings) return 0;
+
+    const premiumValue = parseFloat(premium) || 0;
+    const { perContract, base } = platformSettings.feeStructure;
+
+    return (perContract * quantity) + base;
+  };
+
+  const selectedPlatform = form.watch("platform");
+  const quantity = form.watch("quantity");
+  const premium = form.watch("premium");
+  const calculatedFees = selectedPlatform ? 
+    calculateFees(selectedPlatform, quantity || 0, premium || "0") : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -217,21 +233,30 @@ export default function TradeEntry() {
 
                 <FormField
                   control={form.control}
-                  name="useMargin"
+                  name="platform"
                   render={({ field }) => (
-                    <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Use Margin</FormLabel>
-                        <div className="text-sm text-muted-foreground">
-                          Enable if this trade uses margin
-                        </div>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
+                    <FormItem>
+                      <FormLabel>Trading Platform</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select trading platform" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {user?.platforms?.map((platform) => (
+                            <SelectItem key={platform.id} value={platform.id}>
+                              {platform.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {calculatedFees > 0 && (
+                        <FormDescription>
+                          Estimated fees: ${calculatedFees.toFixed(2)}
+                        </FormDescription>
+                      )}
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
