@@ -1,10 +1,12 @@
-import { type InsertUser, type User, type Trade, type InsertTrade, type UpdateUser, users, trades } from "@shared/schema";
+import { type InsertUser, type User, type Trade, type InsertTrade, users, trades } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import session from "express-session";
-import MemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
+import { type UpdateUser } from "@shared/schema";
 
-const MemoryStoreSession = MemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -24,9 +26,9 @@ export class DatabaseStorage implements IStorage {
   readonly sessionStore: session.Store;
 
   constructor() {
-    // Use memory store instead of PostgreSQL for sessions
-    this.sessionStore = new MemoryStoreSession({
-      checkPeriod: 86400000 // prune expired entries every 24h
+    this.sessionStore = new PostgresSessionStore({ 
+      pool, 
+      createTableIfMissing: true 
     });
   }
 
@@ -49,7 +51,7 @@ export class DatabaseStorage implements IStorage {
     const trade = {
       ...insertTrade,
       userId,
-      strikePrice: insertTrade.strikePrice?.toString(), // Handle optional strikePrice
+      strikePrice: insertTrade.strikePrice.toString(),
       premium: insertTrade.premium.toString(),
     };
     const [createdTrade] = await db.insert(trades).values(trade).returning();
