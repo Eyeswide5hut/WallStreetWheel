@@ -70,6 +70,7 @@ export default function TradeEntry() {
       quantity: 1,
       tags: [],
       legs: [],
+      premium: "", // This will be transformed during submission
     },
   });
 
@@ -85,12 +86,12 @@ export default function TradeEntry() {
         strikePrice: data.strikePrice?.toString(),
         premium: {
           optionType: data.optionType,
-          value: data.premium.toString()
+          value: parseFloat(data.premium)
         },
         legs: data.legs?.map(leg => ({
           ...leg,
           strikePrice: leg.strikePrice.toString(),
-          premium: leg.premium.toString(),
+          premium: parseFloat(leg.premium), //Corrected to parse premium as float for legs
         }))
       };
       const res = await apiRequest("POST", "/api/trades", formattedData);
@@ -127,7 +128,7 @@ export default function TradeEntry() {
 
   const isMultiLegStrategy = spreadOptionTypes.includes(optionType);
 
-  const calculatedFees = selectedPlatform ? 
+  const calculatedFees = selectedPlatform ?
     calculateFees(selectedPlatform, quantity || 0, premium || "0") : 0;
 
   return (
@@ -140,8 +141,8 @@ export default function TradeEntry() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form 
-                onSubmit={form.handleSubmit((data) => tradeMutation.mutate(data))} 
+              <form
+                onSubmit={form.handleSubmit((data) => tradeMutation.mutate(data))}
                 className="space-y-6"
               >
                 <FormField
@@ -170,22 +171,22 @@ export default function TradeEntry() {
                         form.setValue("legs", []);
                         if (spreadOptionTypes.includes(value)) {
                           // Add default legs based on strategy
-                          switch(value) {
+                          switch (value) {
                             case "call_spread":
                             case "put_spread":
                               appendLeg(defaultLegData);
-                              appendLeg({...defaultLegData, side: "sell"});
+                              appendLeg({ ...defaultLegData, side: "sell" });
                               break;
                             case "iron_condor":
                               appendLeg(defaultLegData); // Buy put
-                              appendLeg({...defaultLegData, side: "sell"}); // Sell put
+                              appendLeg({ ...defaultLegData, side: "sell" }); // Sell put
                               appendLeg(defaultLegData); // Buy call
-                              appendLeg({...defaultLegData, side: "sell"}); // Sell call
+                              appendLeg({ ...defaultLegData, side: "sell" }); // Sell call
                               break;
                             case "butterfly":
                               appendLeg(defaultLegData); // Buy 1
-                              appendLeg({...defaultLegData, side: "sell", quantity: 2}); // Sell 2
-                              appendLeg({...defaultLegData}); // Buy 1
+                              appendLeg({ ...defaultLegData, side: "sell", quantity: 2 }); // Sell 2
+                              appendLeg({ ...defaultLegData }); // Buy 1
                               break;
                           }
                         }
@@ -198,7 +199,7 @@ export default function TradeEntry() {
                         <SelectContent>
                           {optionTypes.map((type) => (
                             <SelectItem key={type} value={type}>
-                              {type.split('_').map(word => 
+                              {type.split('_').map(word =>
                                 word.charAt(0).toUpperCase() + word.slice(1)
                               ).join(' ')}
                             </SelectItem>
@@ -258,7 +259,7 @@ export default function TradeEntry() {
                             <Input type="number" step="0.01" {...field} />
                           </FormControl>
                           <FormDescription>
-                            Enter premium amount per contract. For debit trades (buying options), 
+                            Enter premium amount per contract. For debit trades (buying options),
                             this will be treated as a cost.
                           </FormDescription>
                           <FormMessage />
