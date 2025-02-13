@@ -7,23 +7,36 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   email: text("email").notNull(),
-  platform: text("platform").default(null),
+  platform: text("platform"),
   useMargin: boolean("use_margin").default(false),
 });
+
+export const optionTypes = [
+  "long_call",
+  "long_put",
+  "covered_call",
+  "cash_secured_put",
+  "naked_call",
+  "naked_put",
+  "call_spread",
+  "put_spread",
+  "iron_condor",
+  "butterfly",
+] as const;
 
 export const trades = pgTable("trades", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   underlyingAsset: text("underlying_asset").notNull(),
   optionType: text("option_type").notNull(),
-  strikePrice: decimal("strike_price").notNull(),
+  strikePrice: text("strike_price").notNull(),
   expirationDate: timestamp("expiration_date").notNull(),
-  premium: decimal("premium").notNull(),
+  premium: text("premium").notNull(),
   quantity: integer("quantity").notNull(),
-  platform: text("platform").default(null),
+  platform: text("platform"),
   useMargin: boolean("use_margin").default(false),
-  notes: text("notes").default(null),
-  tags: text("tags").array().default([]),
+  notes: text("notes"),
+  tags: text("tags").array(),
   tradeDate: timestamp("trade_date").notNull(),
 });
 
@@ -31,10 +44,17 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true
 });
 
-export const insertTradeSchema = createInsertSchema(trades).omit({
-  id: true,
-  userId: true
-});
+export const insertTradeSchema = createInsertSchema(trades)
+  .omit({
+    id: true,
+    userId: true
+  })
+  .extend({
+    optionType: z.enum(optionTypes),
+    strikePrice: z.string().transform((val) => val.toString()),
+    premium: z.string().transform((val) => val.toString()),
+    quantity: z.string().transform((val) => parseInt(val)),
+  });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;

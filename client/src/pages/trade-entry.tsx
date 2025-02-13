@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertTradeSchema } from "@shared/schema";
+import { insertTradeSchema, optionTypes } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -26,21 +26,37 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+type FormData = {
+  underlyingAsset: string;
+  optionType: typeof optionTypes[number];
+  strikePrice: string;
+  premium: string;
+  quantity: string;
+  expirationDate: string;
+  tradeDate: string;
+  useMargin: boolean;
+  notes?: string;
+  platform?: string;
+  tags: string[];
+};
+
 export default function TradeEntry() {
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
-  
-  const form = useForm({
+
+  const form = useForm<FormData>({
     resolver: zodResolver(insertTradeSchema),
     defaultValues: {
-      tradeDate: new Date().toISOString(),
+      tradeDate: new Date().toISOString().split('T')[0],
+      expirationDate: new Date().toISOString().split('T')[0],
       useMargin: false,
+      quantity: "1",
       tags: [],
     },
   });
 
   const tradeMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: FormData) => {
       const res = await apiRequest("POST", "/api/trades", data);
       return res.json();
     },
@@ -74,34 +90,55 @@ export default function TradeEntry() {
                   <FormItem>
                     <FormLabel>Underlying Asset</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input placeholder="SPY" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="optionType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Option Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="optionType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Option Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select option type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {optionTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type.split('_').map(word => 
+                                word.charAt(0).toUpperCase() + word.slice(1)
+                              ).join(' ')}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantity</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select option type" />
-                        </SelectTrigger>
+                        <Input type="number" min="1" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="call">Call</SelectItem>
-                        <SelectItem value="put">Put</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -133,6 +170,36 @@ export default function TradeEntry() {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="tradeDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Trade Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="expirationDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Expiration Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
                 name="useMargin"
@@ -157,7 +224,7 @@ export default function TradeEntry() {
                   <FormItem>
                     <FormLabel>Notes</FormLabel>
                     <FormControl>
-                      <Textarea {...field} />
+                      <Textarea placeholder="Add any trade notes here..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

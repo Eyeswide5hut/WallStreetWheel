@@ -46,11 +46,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTrade(userId: number, insertTrade: InsertTrade): Promise<Trade> {
-    const [trade] = await db.insert(trades).values({
+    const trade = {
       ...insertTrade,
-      userId
-    }).returning();
-    return trade;
+      userId,
+      strikePrice: insertTrade.strikePrice.toString(),
+      premium: insertTrade.premium.toString(),
+    };
+    const [createdTrade] = await db.insert(trades).values(trade).returning();
+    return createdTrade;
   }
 
   async getUserTrades(userId: number): Promise<Trade[]> {
