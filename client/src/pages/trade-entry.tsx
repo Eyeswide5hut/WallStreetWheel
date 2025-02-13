@@ -236,17 +236,18 @@ export default function TradeEntry() {
                   name="platform"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Trading Platform</FormLabel>
+                      <FormLabel>Trading Account</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select trading platform" />
+                            <SelectValue placeholder="Select trading account" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {user?.platforms?.map((platform) => (
                             <SelectItem key={platform.id} value={platform.id}>
                               {platform.name}
+                              {platform.accountId ? ` - Account #${platform.accountId}` : ''}
                             </SelectItem>
                           ))}
                         </SelectContent>
