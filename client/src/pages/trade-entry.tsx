@@ -91,7 +91,7 @@ export default function TradeEntry() {
         strikePrice: data.strikePrice?.toString(),
         premium: {
           optionType: data.optionType,
-          value: Math.abs(premiumValue) // Always send positive value, schema handles debit/credit
+          value: premiumValue
         },
         legs: data.legs?.map(leg => ({
           ...leg,
