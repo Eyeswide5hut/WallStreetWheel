@@ -48,6 +48,7 @@ export default function ProfileSettings() {
   const form = useForm<UpdateUser>({
     resolver: zodResolver(updateUserSchema),
     defaultValues: {
+      username: user?.username || "",
       email: user?.email || "",
       platforms: user?.platforms || [],
       preferences: user?.preferences || {
@@ -64,6 +65,7 @@ export default function ProfileSettings() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: UpdateUser) => {
+      console.log('Submitting profile update:', data);
       const formattedData = {
         ...data,
         platforms: data.platforms.map(platform => ({
@@ -84,6 +86,7 @@ export default function ProfileSettings() {
       toast({ title: "Profile updated successfully" });
     },
     onError: (error: Error) => {
+      console.error('Profile update error:', error);
       toast({
         title: "Failed to update profile",
         description: error.message,
@@ -112,7 +115,7 @@ export default function ProfileSettings() {
 
   const removePlatform = (index: number) => {
     const platforms = form.getValues("platforms");
-    platforms.splice(index, 1);
+    platforms?.splice(index, 1);
     form.setValue("platforms", platforms);
   };
 
@@ -130,7 +133,16 @@ export default function ProfileSettings() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-8">
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                form.handleSubmit((data) => {
+                  console.log('Form submitted:', data);
+                  updateProfileMutation.mutate(data);
+                })(e);
+              }} 
+              className="space-y-8"
+            >
               <div className="grid gap-6">
                 <FormField
                   control={form.control}
@@ -311,7 +323,7 @@ export default function ProfileSettings() {
                 className="w-full"
                 disabled={updateProfileMutation.isPending}
               >
-                Save Changes
+                {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
               </Button>
             </form>
           </Form>
