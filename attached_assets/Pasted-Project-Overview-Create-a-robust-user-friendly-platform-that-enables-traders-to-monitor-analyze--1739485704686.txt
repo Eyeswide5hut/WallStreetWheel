@@ -1,0 +1,109 @@
+Project Overview:
+
+Create a robust, user-friendly platform that enables traders to monitor, analyze, and enhance their options trading activities. The platform should support secure user authentication, detailed trade logging, performance analytics, fee calculations, and community engagement features. Emphasize modularity, maintainability, and security throughout the development process.
+
+Key Features and Requirements:
+
+User Authentication and Profile Management:
+
+Secure Registration and Login:
+
+Implement user registration with email verification and secure password handling.
+Ensure login sessions are secure and support password recovery options.
+Profile Customization:
+
+Allow users to manage personal information and trading preferences.
+Platform Association:
+Enable users to specify which trading platforms they use.
+Allow assignment of trades to specific platform accounts.
+Automatic Fee Calculation:
+Maintain an up-to-date database of fee structures for various platforms.
+Automatically calculate and apply platform-specific fees to trades.
+Margin Settings:
+Allow users to indicate if they are using margin trading.
+Enable input of margin costs to ensure accurate fee accounting.
+Trade Entry and Management:
+
+Comprehensive Trade Logging:
+
+Provide forms for users to input detailed trade information, including:
+Underlying asset
+Option type (call or put)
+Strike price
+Expiration date
+Premium paid or received
+Trade date
+Quantity
+Associated platform account
+Margin usage details
+Additional notes
+Trade Tagging and Notes:
+
+Allow users to tag trades with customizable labels for better organization.
+Enable adding personal notes or observations to each trade entry.
+Portfolio Overview Dashboard:
+
+Real-Time Performance Monitoring:
+Display summaries of open and closed positions.
+Provide real-time profit and loss (P&L) calculations, accounting for platform fees and margin costs.
+Offer visual representations of portfolio performance over time, such as charts and graphs.
+Analytical Tools:
+
+Trade Analysis:
+Enable filtering and sorting of trades based on various criteria (e.g., date range, asset type, platform).
+Generate reports on trading performance metrics, including:
+Win/loss ratios
+Average returns
+Total net premium earned
+Biggest single loss
+Number of assignments
+Average trade duration
+Leaderboard and Community Engagement:
+
+Trader Rankings:
+Implement a leaderboard ranking traders based on Year-to-Date (YTD) statistics, such as:
+Net Premium
+Win Percentage
+Total Wins
+Total Losses
+Biggest Loss
+Assignments
+Average Trade Duration
+Ensure user privacy by allowing opt-in participation for the leaderboard.
+Responsive Design:
+
+Cross-Device Compatibility:
+Design the platform to be accessible and user-friendly across various devices, including desktops, tablets, and smartphones.
+Ensure consistent performance and appearance across different screen sizes and browsers.
+Security Measures:
+
+Data Protection:
+Implement industry-standard security protocols to protect user data.
+Ensure compliance with relevant data protection regulations.
+Regularly update and patch security vulnerabilities.
+Modular Architecture and Code Quality:
+
+Object-Oriented Design:
+
+Utilize object-oriented programming principles to promote modularity and maintainability.
+Implement dependency injection to manage component dependencies effectively.
+Descriptive Naming Conventions:
+
+Use extremely descriptive variable and function names to enhance code readability.
+Minimize or entirely remove inline comments that describe specific code segments, relying on clear naming for self-documenting code.
+Testing and Quality Assurance:
+
+Comprehensive Testing:
+Develop and execute unit, integration, and user acceptance tests to ensure platform reliability and performance.
+Implement automated testing where feasible to maintain code quality.
+Deployment and Maintenance:
+
+Deployment Strategy:
+Prepare the platform for deployment on a scalable and secure hosting environment.
+Establish a plan for regular maintenance, updates, and feature enhancements.
+Development Approach:
+
+Agile Methodology:
+
+Adopt an agile development approach, breaking down the project into manageable sprints.
+Prioritize features based on user needs and platform stability.
