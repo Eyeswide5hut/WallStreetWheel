@@ -14,6 +14,32 @@ export const tradingPlatforms = [
   "think_or_swim",
 ] as const;
 
+// Categorize option types by whether they are credit or debit trades
+export const debitOptionTypes = [
+  "long_call",
+  "long_put",
+] as const;
+
+export const creditOptionTypes = [
+  "covered_call",
+  "cash_secured_put",
+  "naked_call",
+  "naked_put",
+] as const;
+
+export const spreadOptionTypes = [
+  "call_spread",
+  "put_spread",
+  "iron_condor",
+  "butterfly",
+] as const;
+
+export const optionTypes = [
+  ...debitOptionTypes,
+  ...creditOptionTypes,
+  ...spreadOptionTypes,
+] as const;
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -26,19 +52,6 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
-
-export const optionTypes = [
-  "long_call",
-  "long_put",
-  "covered_call",
-  "cash_secured_put",
-  "naked_call",
-  "naked_put",
-  "call_spread",
-  "put_spread",
-  "iron_condor",
-  "butterfly",
-] as const;
 
 export const trades = pgTable("trades", {
   id: serial("id").primaryKey(),
@@ -70,9 +83,32 @@ export const insertTradeSchema = createInsertSchema(trades)
     strikePrice: z.number().or(z.string()).transform(val => 
       typeof val === 'string' ? parseFloat(val) : val
     ),
-    premium: z.number().or(z.string()).transform(val => 
-      typeof val === 'string' ? parseFloat(val) : val
-    ),
+    premium: z.number().or(z.string()).transform((val, ctx) => {
+      const premium = typeof val === 'string' ? parseFloat(val) : val;
+      const optionType = ctx.parent.optionType;
+
+      // Ensure premium is positive first
+      if (premium <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Premium must be a positive number",
+        });
+        return z.NEVER;
+      }
+
+      // For debit trades (buying options), make premium negative
+      if (debitOptionTypes.includes(optionType as typeof debitOptionTypes[number])) {
+        return -premium;
+      }
+
+      // For credit trades (selling options), keep premium positive
+      if (creditOptionTypes.includes(optionType as typeof creditOptionTypes[number])) {
+        return premium;
+      }
+
+      // For spreads, user inputs net debit/credit directly
+      return premium;
+    }),
     quantity: z.number().int().positive(),
     tradeDate: z.string().transform((val) => {
       const date = new Date(val);

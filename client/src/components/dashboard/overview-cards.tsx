@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trade } from "@shared/schema";
+import { Trade, debitOptionTypes, creditOptionTypes } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 
 export function OverviewCards() {
@@ -24,8 +24,21 @@ export function OverviewCards() {
   }
 
   const totalTrades = trades?.length || 0;
-  const profitableTrades = trades?.filter(t => t.premium > 0).length || 0;
+
+  // A trade is profitable if premium is positive (credit trades) or if it's a completed debit trade
+  const profitableTrades = trades?.filter(t => {
+    const premium = Number(t.premium);
+    if (creditOptionTypes.includes(t.optionType as any)) {
+      return premium > 0; // Credit trades are profitable when premium is positive
+    } else if (debitOptionTypes.includes(t.optionType as any)) {
+      return premium < 0; // Debit trades show as negative premium (cost)
+    }
+    return premium > 0; // For spreads, positive premium means profitable
+  }).length || 0;
+
   const winRate = totalTrades ? (profitableTrades / totalTrades * 100).toFixed(1) : "0";
+
+  // Total P/L is the sum of all premiums (already stored as positive for credits and negative for debits)
   const totalPremium = trades?.reduce((sum, t) => sum + Number(t.premium), 0) || 0;
 
   return (
@@ -38,7 +51,7 @@ export function OverviewCards() {
           <div className="text-2xl font-bold">{totalTrades}</div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
@@ -47,16 +60,18 @@ export function OverviewCards() {
           <div className="text-2xl font-bold">{winRate}%</div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Premium</CardTitle>
+          <CardTitle className="text-sm font-medium">Total P/L</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${totalPremium.toFixed(2)}</div>
+          <div className={`text-2xl font-bold ${totalPremium >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            ${totalPremium.toFixed(2)}
+          </div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Active Trades</CardTitle>

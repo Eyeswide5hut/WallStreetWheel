@@ -26,12 +26,15 @@ export function PerformanceChart() {
     .reduce((acc: any[], trade) => {
       const date = new Date(trade.tradeDate).toLocaleDateString();
       const lastEntry = acc[acc.length - 1] || { cumulative: 0 };
+      // Premium is already stored as positive (credit) or negative (debit)
+      // so we can use it directly in calculations
+      const premium = Number(trade.premium);
       return [
         ...acc,
         {
           date,
-          premium: Number(trade.premium),
-          cumulative: lastEntry.cumulative + Number(trade.premium),
+          premium,
+          cumulative: lastEntry.cumulative + premium,
         },
       ];
     }, []);
@@ -56,7 +59,9 @@ export function PerformanceChart() {
               tickLine={false}
               tickFormatter={(value) => `$${value}`}
             />
-            <Tooltip />
+            <Tooltip 
+              formatter={(value: number) => [`$${value.toFixed(2)}`, 'P/L']}
+            />
             <Line
               type="monotone"
               dataKey="cumulative"
