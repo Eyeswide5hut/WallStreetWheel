@@ -1,10 +1,10 @@
 import { type InsertUser, type User, type Trade, type InsertTrade, users, trades } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
-import { type UpdateUser } from "@shared/schema";
+import { type UpdateUser, type LeaderboardMetric } from "@shared/schema";
 
 const PostgresSessionStore = connectPg(session);
 
@@ -17,6 +17,10 @@ export interface IStorage {
   createTrade(userId: number, trade: InsertTrade): Promise<Trade>;
   getUserTrades(userId: number): Promise<Trade[]>;
   getTrade(id: number): Promise<Trade | undefined>;
+
+  // Leaderboard operations
+  getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<User[]>;
+  getLeaderboardByWinRate(order: "asc" | "desc", limit: number): Promise<User[]>;
 
   sessionStore: session.Store;
   updateUser(id: number, data: UpdateUser): Promise<User>;
@@ -80,6 +84,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  async getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<User[]> {
+    return db
+      .select({
+        id: users.id,
+        username: users.username,
+        [metric]: users[metric],
+        rank: users.rank,
+      })
+      .from(users)
+      .orderBy(sql`${users[metric]} ${sql.raw(order)}`)
+      .limit(limit);
+  }
+
+  async getLeaderboardByWinRate(order: "asc" | "desc", limit: number): Promise<User[]> {
+    return db
+      .select({
+        id: users.id,
+        username: users.username,
+        winRate: sql`CASE 
+          WHEN ${users.tradeCount} = 0 THEN 0
+          ELSE CAST(${users.winCount} AS FLOAT) / ${users.tradeCount}
+        END`,
+        rank: users.rank,
+      })
+      .from(users)
+      .orderBy(sql`winRate ${sql.raw(order)}`)
+      .limit(limit);
   }
 }
 

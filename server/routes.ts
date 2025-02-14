@@ -2,8 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertTradeSchema, updateUserSchema } from "@shared/schema";
+import { insertTradeSchema, updateUserSchema, leaderboardMetricSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+import { ZodError } from "zod";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -18,7 +19,7 @@ export function registerRoutes(app: Express): Server {
       res.json(updatedUser);
     } catch (error) {
       console.error('Profile update error:', error);
-      if (error.errors) {
+      if (error instanceof ZodError) {
         res.status(400).json({ error: fromZodError(error).message });
       } else {
         res.status(400).json({ error: "Invalid profile data" });
@@ -36,7 +37,7 @@ export function registerRoutes(app: Express): Server {
       res.status(201).json(trade);
     } catch (error) {
       console.error('Trade validation error:', error);
-      if (error.errors) {
+      if (error instanceof ZodError) {
         res.status(400).json({ error: fromZodError(error).message });
       } else {
         res.status(400).json({ error: "Invalid trade data" });
@@ -49,6 +50,42 @@ export function registerRoutes(app: Express): Server {
 
     const trades = await storage.getUserTrades(req.user!.id);
     res.json(trades);
+  });
+
+  // Leaderboard routes
+  app.get("/api/leaderboard", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const query = leaderboardMetricSchema.parse(req.query);
+
+      // Calculate win rate if that's the requested metric
+      if (query.metric === "winRate") {
+        const leaders = await storage.getLeaderboardByWinRate(query.order, query.limit);
+        return res.json(leaders);
+      }
+
+      // For other metrics, use the direct column values
+      const leaders = await storage.getLeaderboard(
+        query.metric,
+        query.order,
+        query.limit
+      );
+
+      res.json(leaders.map((user) => ({
+        id: user.id,
+        username: user.username,
+        [query.metric]: user[query.metric],
+        rank: user.rank
+      })));
+    } catch (error) {
+      console.error('Leaderboard error:', error);
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: fromZodError(error).message });
+      } else {
+        res.status(400).json({ error: "Invalid leaderboard query" });
+      }
+    }
   });
 
   const httpServer = createServer(app);

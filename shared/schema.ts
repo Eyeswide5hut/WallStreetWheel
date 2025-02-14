@@ -49,6 +49,11 @@ export const users = pgTable("users", {
   preferences: jsonb("preferences").default('{}'),
   marginEnabled: boolean("margin_enabled").default(false),
   marginRate: decimal("margin_rate"),
+  totalProfitLoss: decimal("total_profit_loss").default('0'),
+  tradeCount: integer("trade_count").default(0),
+  winCount: integer("win_count").default(0),
+  averageReturn: decimal("average_return").default('0'),
+  rank: integer("rank"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -82,31 +87,35 @@ export const trades = pgTable("trades", {
   tradeDate: timestamp("trade_date").notNull(),
   expirationDate: timestamp("expiration_date").notNull(),
   legs: jsonb("legs").default('[]'), // For multi-leg trades
+  profitLoss: decimal("profit_loss"),
+  isWin: boolean("is_win"),
+  returnPercentage: decimal("return_percentage"),
 });
 
 export const insertUserSchema = createInsertSchema(users)
   .omit({
     id: true,
     createdAt: true,
-    updatedAt: true
+    updatedAt: true,
+    totalProfitLoss: true,
+    tradeCount: true,
+    winCount: true,
+    averageReturn: true,
+    rank: true
   });
 
 export const insertTradeSchema = createInsertSchema(trades)
   .omit({
     id: true,
-    userId: true
+    userId: true,
+    profitLoss: true,
+    isWin: true,
+    returnPercentage: true
   })
   .extend({
     optionType: z.enum(optionTypes),
     strikePrice: basePremiumSchema.optional(),
-    premium: basePremiumSchema.transform((val) => {
-      // For debit trades (buying options), make premium negative
-      if (debitOptionTypes.includes(optionType as typeof debitOptionTypes[number])) {
-        return -val;
-      }
-      // For credit trades (selling options), keep premium positive
-      return val;
-    }),
+    premium: basePremiumSchema,
     quantity: z.number().int().positive(),
     legs: z.array(optionLegSchema).optional(),
     tradeDate: z.string().transform((val) => {
@@ -119,6 +128,13 @@ export const insertTradeSchema = createInsertSchema(trades)
       if (isNaN(date.getTime())) throw new Error("Invalid expiration date");
       return date;
     }),
+  }).superRefine((data, ctx) => {
+    // Transform premium based on option type
+    if (debitOptionTypes.includes(data.optionType as typeof debitOptionTypes[number])) {
+      data.premium = -Math.abs(data.premium);
+    } else {
+      data.premium = Math.abs(data.premium);
+    }
   });
 
 export const userPreferencesSchema = z.object({
@@ -162,3 +178,13 @@ export type Trade = typeof trades.$inferSelect;
 export type UpdateUser = z.infer<typeof updateUserSchema>;
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
+
+export type LeaderboardMetric = "totalProfitLoss" | "winRate" | "tradeCount" | "averageReturn";
+
+export const leaderboardMetricSchema = z.object({
+  metric: z.enum(["totalProfitLoss", "winRate", "tradeCount", "averageReturn"]),
+  order: z.enum(["asc", "desc"]).default("desc"),
+  limit: z.number().int().positive().default(10)
+});
+
+export type LeaderboardQuery = z.infer<typeof leaderboardMetricSchema>;
