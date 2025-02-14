@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import TradeEntry from "@/pages/trade-entry";
 import ProfileSettings from "@/pages/profile-settings";
+import LeaderboardPage from "@/pages/leaderboard-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
       <ProtectedRoute path="/" component={HomePage} />
       <ProtectedRoute path="/trade" component={TradeEntry} />
       <ProtectedRoute path="/profile" component={ProfileSettings} />
+      <ProtectedRoute path="/leaderboard" component={LeaderboardPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>

@@ -17,6 +17,9 @@ export function NavHeader() {
           <Link href="/trade">
             <Button variant="outline">New Trade</Button>
           </Link>
+          <Link href="/leaderboard">
+            <Button variant="outline">Leaderboard</Button>
+          </Link>
           <Link href="/profile">
             <Button variant="outline">Profile Settings</Button>
           </Link>
