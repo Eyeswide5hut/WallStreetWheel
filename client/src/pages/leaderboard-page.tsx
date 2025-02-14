@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NavHeader } from "@/components/layout/nav-header";
 import { useState } from "react";
-import type { LeaderboardMetric, User } from "@shared/schema";
+import type { LeaderboardMetric } from "@shared/schema";
 
 const metrics: { value: LeaderboardMetric; label: string }[] = [
   { value: "totalProfitLoss", label: "Total P/L" },
@@ -12,16 +12,44 @@ const metrics: { value: LeaderboardMetric; label: string }[] = [
   { value: "averageReturn", label: "Average Return" },
 ];
 
-type LeaderboardUser = Pick<User, "id" | "username"> & {
-  [K in LeaderboardMetric]: K extends "winRate" ? number : string | number | null;
+type LeaderboardEntry = {
+  id: number;
+  username: string;
+  totalProfitLoss: string | null;
+  tradeCount: number | null;
+  averageReturn: string | null;
+  winRate: number;
 };
 
 export default function LeaderboardPage() {
   const [metric, setMetric] = useState<LeaderboardMetric>("totalProfitLoss");
 
-  const { data: leaders = [], isLoading } = useQuery<LeaderboardUser[]>({
+  const { data: leaders = [], isLoading } = useQuery<LeaderboardEntry[]>({
     queryKey: ["/api/leaderboard", { metric, order: "desc", limit: 10 }],
+    queryFn: ({ queryKey }) => {
+      const [, params] = queryKey;
+      const searchParams = new URLSearchParams(params as Record<string, string>);
+      return fetch(`/api/leaderboard?${searchParams}`).then(res => {
+        if (!res.ok) throw new Error('Failed to fetch leaderboard');
+        return res.json();
+      });
+    },
   });
+
+  const formatValue = (leader: LeaderboardEntry) => {
+    switch (metric) {
+      case "totalProfitLoss":
+        return leader.totalProfitLoss ? `$${parseFloat(leader.totalProfitLoss).toFixed(2)}` : '$0.00';
+      case "winRate":
+        return `${(leader.winRate * 100).toFixed(1)}%`;
+      case "tradeCount":
+        return leader.tradeCount?.toString() || '0';
+      case "averageReturn":
+        return leader.averageReturn ? `${parseFloat(leader.averageReturn).toFixed(1)}%` : '0.0%';
+      default:
+        return '0';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -65,13 +93,15 @@ export default function LeaderboardPage() {
                       <span className="font-medium">{leader.username}</span>
                     </div>
                     <span className="font-mono">
-                      {metric === "totalProfitLoss" && `$${leader[metric]}`}
-                      {metric === "winRate" && `${(Number(leader[metric]) * 100).toFixed(1)}%`}
-                      {metric === "tradeCount" && leader[metric]}
-                      {metric === "averageReturn" && `${Number(leader[metric]).toFixed(1)}%`}
+                      {formatValue(leader)}
                     </span>
                   </div>
                 ))}
+                {leaders.length === 0 && (
+                  <div className="py-4 text-center text-muted-foreground">
+                    No data available
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

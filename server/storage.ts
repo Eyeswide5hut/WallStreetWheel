@@ -111,9 +111,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<Partial<User>[]> {
-    const column = users[metric];
-    if (!column) {
-      throw new Error(`Invalid metric: ${metric}`);
+    const winRateExpr = sql`CASE 
+      WHEN ${users.tradeCount} = 0 THEN 0
+      ELSE CAST(${users.winCount} AS FLOAT) / NULLIF(${users.tradeCount}, 0)
+    END`;
+
+    let orderExpr;
+    if (metric === 'winRate') {
+      orderExpr = sql`${winRateExpr} ${sql.raw(order)}`;
+    } else {
+      orderExpr = sql`${users[metric]} ${sql.raw(order)}`;
     }
 
     return db
@@ -123,15 +130,10 @@ export class DatabaseStorage implements IStorage {
         totalProfitLoss: users.totalProfitLoss,
         tradeCount: users.tradeCount,
         averageReturn: users.averageReturn,
-        winRate: sql`CASE 
-          WHEN ${users.tradeCount} = 0 THEN 0
-          ELSE CAST(${users.winCount} AS FLOAT) / ${users.tradeCount}
-        END`,
+        winRate: winRateExpr,
       })
       .from(users)
-      .orderBy(metric === 'winRate' ? 
-        sql`winRate ${sql.raw(order)}` : 
-        sql`${column} ${sql.raw(order)}`)
+      .orderBy(orderExpr)
       .limit(limit);
   }
 }
