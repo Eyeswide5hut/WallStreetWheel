@@ -58,25 +58,17 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const query = leaderboardMetricSchema.parse(req.query);
-
-      // Calculate win rate if that's the requested metric
-      if (query.metric === "winRate") {
-        const leaders = await storage.getLeaderboardByWinRate(query.order, query.limit);
-        return res.json(leaders);
-      }
-
-      // For other metrics, use the direct column values
       const leaders = await storage.getLeaderboard(
         query.metric,
         query.order,
         query.limit
       );
 
+      // Format the response based on the metric
       res.json(leaders.map((user) => ({
         id: user.id,
         username: user.username,
-        [query.metric]: user[query.metric],
-        rank: user.rank
+        value: query.metric === 'winRate' ? user.winRate : user[query.metric],
       })));
     } catch (error) {
       console.error('Leaderboard error:', error);

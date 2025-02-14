@@ -16,7 +16,6 @@ export interface IStorage {
   getUserTrades(userId: number): Promise<Trade[]>;
   getTrade(id: number): Promise<Trade | undefined>;
   getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<Partial<User>[]>;
-  getLeaderboardByWinRate(order: "asc" | "desc", limit: number): Promise<Partial<User>[]>;
   sessionStore: session.Store;
   updateUser(id: number, data: UpdateUser): Promise<User>;
 }
@@ -112,34 +111,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<Partial<User>[]> {
+    const column = users[metric];
+    if (!column) {
+      throw new Error(`Invalid metric: ${metric}`);
+    }
+
     return db
       .select({
         id: users.id,
         username: users.username,
         totalProfitLoss: users.totalProfitLoss,
-        winCount: users.winCount,
         tradeCount: users.tradeCount,
         averageReturn: users.averageReturn,
-        rank: users.rank,
-      })
-      .from(users)
-      .orderBy(sql`${users[metric]} ${sql.raw(order)}`)
-      .limit(limit);
-  }
-
-  async getLeaderboardByWinRate(order: "asc" | "desc", limit: number): Promise<Partial<User>[]> {
-    return db
-      .select({
-        id: users.id,
-        username: users.username,
         winRate: sql`CASE 
           WHEN ${users.tradeCount} = 0 THEN 0
           ELSE CAST(${users.winCount} AS FLOAT) / ${users.tradeCount}
         END`,
-        rank: users.rank,
       })
       .from(users)
-      .orderBy(sql`winRate ${sql.raw(order)}`)
+      .orderBy(metric === 'winRate' ? 
+        sql`winRate ${sql.raw(order)}` : 
+        sql`${column} ${sql.raw(order)}`)
       .limit(limit);
   }
 }
