@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NavHeader } from "@/components/layout/nav-header";
 import { useState } from "react";
-import type { LeaderboardMetric } from "@shared/schema";
+import type { LeaderboardMetric, User } from "@shared/schema";
 
 const metrics: { value: LeaderboardMetric; label: string }[] = [
   { value: "totalProfitLoss", label: "Total P/L" },
@@ -12,10 +12,14 @@ const metrics: { value: LeaderboardMetric; label: string }[] = [
   { value: "averageReturn", label: "Average Return" },
 ];
 
+type LeaderboardUser = Pick<User, "id" | "username"> & {
+  [K in LeaderboardMetric]: K extends "winRate" ? number : string | number | null;
+};
+
 export default function LeaderboardPage() {
   const [metric, setMetric] = useState<LeaderboardMetric>("totalProfitLoss");
 
-  const { data: leaders = [], isLoading } = useQuery({
+  const { data: leaders = [], isLoading } = useQuery<LeaderboardUser[]>({
     queryKey: ["/api/leaderboard", { metric, order: "desc", limit: 10 }],
   });
 
@@ -62,9 +66,9 @@ export default function LeaderboardPage() {
                     </div>
                     <span className="font-mono">
                       {metric === "totalProfitLoss" && `$${leader[metric]}`}
-                      {metric === "winRate" && `${(leader[metric] * 100).toFixed(1)}%`}
+                      {metric === "winRate" && `${(Number(leader[metric]) * 100).toFixed(1)}%`}
                       {metric === "tradeCount" && leader[metric]}
-                      {metric === "averageReturn" && `${leader[metric]}%`}
+                      {metric === "averageReturn" && `${Number(leader[metric]).toFixed(1)}%`}
                     </span>
                   </div>
                 ))}
