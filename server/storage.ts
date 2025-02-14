@@ -12,16 +12,11 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-
-  // Trade operations
   createTrade(userId: number, trade: InsertTrade): Promise<Trade>;
   getUserTrades(userId: number): Promise<Trade[]>;
   getTrade(id: number): Promise<Trade | undefined>;
-
-  // Leaderboard operations
-  getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<User[]>;
-  getLeaderboardByWinRate(order: "asc" | "desc", limit: number): Promise<User[]>;
-
+  getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<Partial<User>[]>;
+  getLeaderboardByWinRate(order: "asc" | "desc", limit: number): Promise<Partial<User>[]>;
   sessionStore: session.Store;
   updateUser(id: number, data: UpdateUser): Promise<User>;
 }
@@ -43,13 +38,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    try {
+      const [user] = await db.select().from(users).where(eq(users.id, id));
+      return user;
+    } catch (error) {
+      console.error('Error retrieving user:', error);
+      return undefined;
+    }
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    try {
+      const [user] = await db.select().from(users).where(eq(users.username, username));
+      return user;
+    } catch (error) {
+      console.error('Error retrieving user by username:', error);
+      return undefined;
+    }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -86,12 +91,15 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<User[]> {
+  async getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<Partial<User>[]> {
     return db
       .select({
         id: users.id,
         username: users.username,
-        [metric]: users[metric],
+        totalProfitLoss: users.totalProfitLoss,
+        winCount: users.winCount,
+        tradeCount: users.tradeCount,
+        averageReturn: users.averageReturn,
         rank: users.rank,
       })
       .from(users)
@@ -99,7 +107,7 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getLeaderboardByWinRate(order: "asc" | "desc", limit: number): Promise<User[]> {
+  async getLeaderboardByWinRate(order: "asc" | "desc", limit: number): Promise<Partial<User>[]> {
     return db
       .select({
         id: users.id,
