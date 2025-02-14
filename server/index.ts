@@ -52,24 +52,48 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = registerRoutes(app);
+  try {
+    // First verify database connection
+    const { pool } = await import("./db");
+    try {
+      await pool.query('SELECT 1');
+      log('Database connection successful');
+    } catch (err) {
+      console.error('Database connection failed:', err);
+      process.exit(1);
+    }
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+    const server = registerRoutes(app);
+
+    if (app.get("env") === "development") {
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
+    }
+
+    // Use PORT from environment or fallback to 5000
+    const PORT = process.env.PORT || 5000;
+
+    // Kill any existing process on the port (development only)
+    if (app.get("env") === "development") {
+      try {
+        await new Promise((resolve, reject) => {
+          const { exec } = require('child_process');
+          exec(`lsof -ti :${PORT} | xargs kill -9`, (error: any) => {
+            // Ignore errors since the port might not be in use
+            resolve(null);
+          });
+        });
+      } catch (err) {
+        // Ignore kill errors
+      }
+    }
+
+    server.listen(PORT, "0.0.0.0", () => {
+      log(`Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
   }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client
-  const PORT = 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    log(`serving on port ${PORT}`);
-  });
-})().catch(err => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+})();

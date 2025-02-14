@@ -26,10 +26,16 @@ export class DatabaseStorage implements IStorage {
   readonly sessionStore: session.Store;
 
   constructor() {
-    this.sessionStore = new PostgresSessionStore({ 
-      pool, 
-      createTableIfMissing: true 
-    });
+    // Configure session store for Neon
+    const pgStoreOptions = {
+      conObject: {
+        connectionString: process.env.DATABASE_URL,
+      },
+      createTableIfMissing: true,
+      tableName: 'session'
+    };
+
+    this.sessionStore = new PostgresSessionStore(pgStoreOptions);
   }
 
   async getUser(id: number): Promise<User | undefined> {
@@ -51,7 +57,7 @@ export class DatabaseStorage implements IStorage {
     const trade = {
       ...insertTrade,
       userId,
-      strikePrice: insertTrade.strikePrice.toString(),
+      strikePrice: insertTrade.strikePrice?.toString(),
       premium: insertTrade.premium.toString(),
     };
     const [createdTrade] = await db.insert(trades).values(trade).returning();
