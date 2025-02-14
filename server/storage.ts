@@ -146,14 +146,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const [trader] = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          totalProfitLoss: users.totalProfitLoss,
-          tradeCount: users.tradeCount,
-          winCount: users.winCount,
-          averageReturn: users.averageReturn,
-        })
+        .select()
         .from(users)
         .where(eq(users.id, id))
         .execute();
