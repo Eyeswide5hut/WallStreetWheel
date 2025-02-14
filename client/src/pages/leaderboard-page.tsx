@@ -15,20 +15,20 @@ const metrics: { value: LeaderboardMetric; label: string }[] = [
 type LeaderboardEntry = {
   id: number;
   username: string;
-  totalProfitLoss: string | null;
-  tradeCount: number | null;
-  averageReturn: string | null;
-  winRate: number;
+  value: number | string;
 };
 
 export default function LeaderboardPage() {
   const [metric, setMetric] = useState<LeaderboardMetric>("totalProfitLoss");
 
   const { data: leaders = [], isLoading } = useQuery<LeaderboardEntry[]>({
-    queryKey: ["/api/leaderboard", { metric, order: "desc", limit: 10 }],
-    queryFn: ({ queryKey }) => {
-      const [, params] = queryKey;
-      const searchParams = new URLSearchParams(params as Record<string, string>);
+    queryKey: ["/api/leaderboard", metric],
+    queryFn: () => {
+      const searchParams = new URLSearchParams({
+        metric,
+        order: 'desc',
+        limit: '10'
+      });
       return fetch(`/api/leaderboard?${searchParams}`).then(res => {
         if (!res.ok) throw new Error('Failed to fetch leaderboard');
         return res.json();
@@ -36,16 +36,17 @@ export default function LeaderboardPage() {
     },
   });
 
-  const formatValue = (leader: LeaderboardEntry) => {
+  const formatValue = (value: number | string) => {
     switch (metric) {
       case "totalProfitLoss":
-        return leader.totalProfitLoss ? `$${parseFloat(leader.totalProfitLoss).toFixed(2)}` : '$0.00';
+        return typeof value === 'string' ? `$${parseFloat(value).toFixed(2)}` : `$${value.toFixed(2)}`;
       case "winRate":
-        return `${(leader.winRate * 100).toFixed(1)}%`;
+        return typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : '0.0%';
       case "tradeCount":
-        return leader.tradeCount?.toString() || '0';
+        return value.toString();
       case "averageReturn":
-        return leader.averageReturn ? `${parseFloat(leader.averageReturn).toFixed(1)}%` : '0.0%';
+        return typeof value === 'number' ? `${value.toFixed(1)}%` : 
+               typeof value === 'string' ? `${parseFloat(value).toFixed(1)}%` : '0.0%';
       default:
         return '0';
     }
@@ -93,11 +94,11 @@ export default function LeaderboardPage() {
                       <span className="font-medium">{leader.username}</span>
                     </div>
                     <span className="font-mono">
-                      {formatValue(leader)}
+                      {formatValue(leader.value)}
                     </span>
                   </div>
                 ))}
-                {leaders.length === 0 && (
+                {!isLoading && leaders.length === 0 && (
                   <div className="py-4 text-center text-muted-foreground">
                     No data available
                   </div>

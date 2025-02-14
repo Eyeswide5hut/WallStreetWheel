@@ -57,19 +57,30 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      const query = leaderboardMetricSchema.parse(req.query);
+      const query = leaderboardMetricSchema.parse({
+        metric: req.query.metric,
+        order: req.query.order || 'desc',
+        limit: parseInt(req.query.limit as string) || 10
+      });
+
       const leaders = await storage.getLeaderboard(
         query.metric,
         query.order,
         query.limit
       );
 
-      // Format the response based on the metric
-      res.json(leaders.map((user) => ({
+      // Format the response to match frontend expectations
+      const formattedLeaders = leaders.map(user => ({
         id: user.id,
         username: user.username,
-        value: query.metric === 'winRate' ? user.winRate : user[query.metric],
-      })));
+        value: query.metric === 'winRate' ? 
+          user.winRate : 
+          query.metric === 'totalProfitLoss' ? 
+            user.totalProfitLoss : 
+            user[query.metric]
+      }));
+
+      res.json(formattedLeaders);
     } catch (error) {
       console.error('Leaderboard error:', error);
       if (error instanceof ZodError) {
