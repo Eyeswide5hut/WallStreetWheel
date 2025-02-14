@@ -73,10 +73,10 @@ export function registerRoutes(app: Express): Server {
       const formattedLeaders = leaders.map(user => ({
         id: user.id,
         username: user.username,
-        value: query.metric === 'winRate' ? 
-          user.winRate : 
-          query.metric === 'totalProfitLoss' ? 
-            user.totalProfitLoss : 
+        value: query.metric === 'winRate' ?
+          user.winRate :
+          query.metric === 'totalProfitLoss' ?
+            user.totalProfitLoss :
             user[query.metric]
       }));
 
@@ -88,6 +88,27 @@ export function registerRoutes(app: Express): Server {
       } else {
         res.status(400).json({ error: "Invalid leaderboard query" });
       }
+    }
+  });
+
+  app.get("/api/traders/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const traderId = parseInt(req.params.id);
+      if (isNaN(traderId)) {
+        return res.status(400).json({ error: "Invalid trader ID" });
+      }
+
+      const trader = await storage.getTraderProfile(traderId);
+      if (!trader) {
+        return res.status(404).json({ error: "Trader not found" });
+      }
+
+      res.json(trader);
+    } catch (error) {
+      console.error('Trader profile error:', error);
+      res.status(500).json({ error: "Failed to fetch trader profile" });
     }
   });
 

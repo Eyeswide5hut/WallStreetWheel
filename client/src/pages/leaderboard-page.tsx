@@ -3,6 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NavHeader } from "@/components/layout/nav-header";
 import { useState } from "react";
+import { Link } from "wouter";
 import type { LeaderboardMetric } from "@shared/schema";
 
 const metrics: { value: LeaderboardMetric; label: string }[] = [
@@ -45,7 +46,7 @@ export default function LeaderboardPage() {
       case "tradeCount":
         return value.toString();
       case "averageReturn":
-        return typeof value === 'number' ? `${value.toFixed(1)}%` : 
+        return typeof value === 'number' ? `${value.toFixed(1)}%` :
                typeof value === 'string' ? `${parseFloat(value).toFixed(1)}%` : '0.0%';
       default:
         return '0';
@@ -83,20 +84,21 @@ export default function LeaderboardPage() {
             <CardContent>
               <div className="divide-y">
                 {leaders.map((leader, index) => (
-                  <div
-                    key={leader.id}
-                    className="flex items-center justify-between py-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <span className="text-2xl font-bold text-muted-foreground">
-                        #{index + 1}
+                  <Link key={leader.id} href={`/traders/${leader.id}`}>
+                    <div
+                      className="flex items-center justify-between py-4 hover:bg-accent/50 cursor-pointer rounded-md px-2 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-2xl font-bold text-muted-foreground">
+                          #{index + 1}
+                        </span>
+                        <span className="font-medium">{leader.username}</span>
+                      </div>
+                      <span className="font-mono">
+                        {formatValue(leader.value)}
                       </span>
-                      <span className="font-medium">{leader.username}</span>
                     </div>
-                    <span className="font-mono">
-                      {formatValue(leader.value)}
-                    </span>
-                  </div>
+                  </Link>
                 ))}
                 {!isLoading && leaders.length === 0 && (
                   <div className="py-4 text-center text-muted-foreground">

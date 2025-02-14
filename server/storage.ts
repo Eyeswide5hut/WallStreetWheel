@@ -18,6 +18,7 @@ export interface IStorage {
   getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<Partial<User>[]>;
   sessionStore: session.Store;
   updateUser(id: number, data: UpdateUser): Promise<User>;
+  getTraderProfile(id: number): Promise<User | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -135,6 +136,33 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .orderBy(orderExpr)
       .limit(limit);
+  }
+
+  async getTraderProfile(id: number): Promise<User | undefined> {
+    try {
+      if (!id || typeof id !== 'number') {
+        console.error('Invalid trader ID:', id);
+        return undefined;
+      }
+
+      const [trader] = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          totalProfitLoss: users.totalProfitLoss,
+          tradeCount: users.tradeCount,
+          winCount: users.winCount,
+          averageReturn: users.averageReturn,
+        })
+        .from(users)
+        .where(eq(users.id, id))
+        .execute();
+
+      return trader;
+    } catch (error) {
+      console.error('Error retrieving trader profile:', error);
+      return undefined;
+    }
   }
 }
 
