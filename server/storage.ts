@@ -39,7 +39,17 @@ export class DatabaseStorage implements IStorage {
 
   async getUser(id: number): Promise<User | undefined> {
     try {
-      const [user] = await db.select().from(users).where(eq(users.id, id));
+      if (!id || typeof id !== 'number') {
+        console.error('Invalid user ID:', id);
+        return undefined;
+      }
+
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, id))
+        .execute();
+
       return user;
     } catch (error) {
       console.error('Error retrieving user:', error);
@@ -49,7 +59,17 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
-      const [user] = await db.select().from(users).where(eq(users.username, username));
+      if (!username) {
+        console.error('Invalid username:', username);
+        return undefined;
+      }
+
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username))
+        .execute();
+
       return user;
     } catch (error) {
       console.error('Error retrieving user by username:', error);

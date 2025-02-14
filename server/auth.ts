@@ -58,24 +58,34 @@ export function setupAuth(app: Express) {
         }
         return done(null, user);
       } catch (err) {
+        console.error("Login error:", err);
         return done(err);
       }
     }),
   );
 
-  passport.serializeUser((user, done) => {
+  passport.serializeUser((user: Express.User, done) => {
+    if (!user?.id) {
+      return done(new Error("Cannot serialize user without id"), null);
+    }
     done(null, user.id);
   });
 
   passport.deserializeUser(async (id: number, done) => {
     try {
+      if (!id || typeof id !== 'number') {
+        return done(new Error('Invalid user id'), null);
+      }
+
       const user = await storage.getUser(id);
       if (!user) {
-        return done(new Error('User not found'), null);
+        return done(null, false);
       }
+
       done(null, user);
     } catch (err) {
-      done(err);
+      console.error("Deserialization error:", err);
+      done(err, null);
     }
   });
 
@@ -96,6 +106,7 @@ export function setupAuth(app: Express) {
         res.status(201).json(user);
       });
     } catch (err) {
+      console.error("Registration error:", err);
       next(err);
     }
   });
@@ -107,7 +118,10 @@ export function setupAuth(app: Express) {
   app.post("/api/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
-      res.sendStatus(200);
+      req.session.destroy((err) => {
+        if (err) return next(err);
+        res.sendStatus(200);
+      });
     });
   });
 
