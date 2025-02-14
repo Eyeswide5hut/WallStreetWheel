@@ -1,6 +1,16 @@
 import { db } from "../server/db";
 import { users, trades } from "@shared/schema";
 import { sql } from "drizzle-orm";
+import { scrypt, randomBytes } from "crypto";
+import { promisify } from "util";
+
+const scryptAsync = promisify(scrypt);
+
+async function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString("hex")}.${salt}`;
+}
 
 async function seed() {
   // Clear existing data
@@ -8,25 +18,27 @@ async function seed() {
   await db.delete(users);
 
   // Create 20 test users with varied profiles
-  const testUsers = Array.from({ length: 20 }, (_, i) => ({
-    username: `trader${i + 1}`,
-    email: `trader${i + 1}@example.com`,
-    password: "password123", // In a real app, this would be hashed
-    marginEnabled: Math.random() > 0.5,
-    marginRate: "6.5",
-    platforms: JSON.stringify([
-      {
-        id: "robinhood",
-        name: "Robinhood",
-        enabled: true,
-        feeStructure: { perContract: 0.65, base: 0 }
-      }
-    ]),
-    preferences: JSON.stringify({
-      theme: "system",
-      notifications: { email: true, web: true }
-    })
-  }));
+  const testUsers = await Promise.all(
+    Array.from({ length: 20 }, async (_, i) => ({
+      username: `trader${i + 1}`,
+      email: `trader${i + 1}@example.com`,
+      password: await hashPassword("password123"), // Hash the password
+      marginEnabled: Math.random() > 0.5,
+      marginRate: "6.5",
+      platforms: JSON.stringify([
+        {
+          id: "robinhood",
+          name: "Robinhood",
+          enabled: true,
+          feeStructure: { perContract: 0.65, base: 0 }
+        }
+      ]),
+      preferences: JSON.stringify({
+        theme: "system",
+        notifications: { email: true, web: true }
+      })
+    }))
+  );
 
   const createdUsers = await db.insert(users).values(testUsers).returning();
 
@@ -34,14 +46,14 @@ async function seed() {
   for (const user of createdUsers) {
     const numTrades = Math.floor(Math.random() * 40) + 10; // 10-50 trades per user
     const tradeDate = new Date();
-    
+
     for (let i = 0; i < numTrades; i++) {
       const isWin = Math.random() > 0.4; // 60% win rate on average
       const premium = (Math.random() * 500 + 100).toFixed(2);
       const profitLoss = isWin 
         ? (parseFloat(premium) * (Math.random() * 0.5 + 0.1)).toFixed(2)
         : (-parseFloat(premium) * (Math.random() * 0.3 + 0.1)).toFixed(2);
-      
+
       tradeDate.setDate(tradeDate.getDate() - Math.floor(Math.random() * 30));
       const expirationDate = new Date(tradeDate);
       expirationDate.setDate(tradeDate.getDate() + 30);
