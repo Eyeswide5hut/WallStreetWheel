@@ -9,6 +9,7 @@ import AuthPage from "@/pages/auth-page";
 import TradeEntry from "@/pages/trade-entry";
 import ProfileSettings from "@/pages/profile-settings";
 import LeaderboardPage from "@/pages/leaderboard-page";
+import TraderDashboard from "@/pages/trader-dashboard";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -18,6 +19,7 @@ function Router() {
       <ProtectedRoute path="/trade" component={TradeEntry} />
       <ProtectedRoute path="/profile" component={ProfileSettings} />
       <ProtectedRoute path="/leaderboard" component={LeaderboardPage} />
+      <ProtectedRoute path="/traders/:id" component={TraderDashboard} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
