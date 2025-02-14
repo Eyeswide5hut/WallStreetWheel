@@ -6,15 +6,19 @@ import { useParams } from "wouter";
 import { Loader2 } from "lucide-react";
 
 export default function TraderDashboard() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = params?.id;
 
   const { data: trader, isLoading, error } = useQuery<User>({
     queryKey: ["/api/traders", id],
-    queryFn: () => 
-      fetch(`/api/traders/${id}`).then(res => {
+    queryFn: () => {
+      if (!id) throw new Error('Trader ID is required');
+      return fetch(`/api/traders/${id}`).then(res => {
         if (!res.ok) throw new Error('Failed to fetch trader details');
         return res.json();
-      }),
+      });
+    },
+    enabled: !!id,
   });
 
   if (isLoading) {
