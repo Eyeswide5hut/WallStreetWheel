@@ -73,26 +73,36 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
     mutationFn: async (data: CloseTradeData) => {
       if (!trade) throw new Error("No trade selected");
 
-      const response = await apiRequest("PATCH", `/api/trades/${trade.id}/close`, {
-        closePrice: data.closePrice,
-        closeDate: new Date(data.closeDate),
-        wasAssigned: data.wasAssigned
-      });
+      try {
+        const response = await apiRequest("PATCH", `/api/trades/${trade.id}/close`, {
+          closePrice: data.closePrice,
+          closeDate: new Date(data.closeDate).toISOString(),
+          wasAssigned: data.wasAssigned
+        });
 
-      if (!response.ok) {
-        // Try to parse error as JSON first
         const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to close trade");
-        } else {
-          // Fallback to text if not JSON
-          const errorText = await response.text();
-          throw new Error(errorText || "Failed to close trade");
+        if (!response.ok) {
+          if (contentType?.includes("application/json")) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Failed to close trade");
+          } else {
+            const errorText = await response.text();
+            throw new Error("Failed to close trade: Server error");
+          }
         }
-      }
 
-      return response.json();
+        // Ensure we have JSON response
+        if (!contentType?.includes("application/json")) {
+          throw new Error("Invalid server response format");
+        }
+
+        return response.json();
+      } catch (error) {
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error("An unexpected error occurred");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trades"] });

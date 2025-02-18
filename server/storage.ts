@@ -181,49 +181,58 @@ export class DatabaseStorage implements IStorage {
     closeDate: Date;
     wasAssigned: boolean;
   }): Promise<Trade> {
-    const [trade] = await db
-      .select()
-      .from(trades)
-      .where(eq(trades.id, tradeId));
+    try {
+      const [trade] = await db
+        .select()
+        .from(trades)
+        .where(eq(trades.id, tradeId));
 
-    if (!trade) {
-      throw new Error("Trade not found");
+      if (!trade) {
+        throw new Error("Trade not found");
+      }
+
+      if (trade.closeDate) {
+        throw new Error("Trade is already closed");
+      }
+
+      const initialCost = parseFloat(trade.premium) * trade.quantity;
+      const finalValue = closeData.closePrice * trade.quantity;
+      const profitLoss = finalValue - initialCost;
+      const returnPercentage = (profitLoss / Math.abs(initialCost) * 100).toString();
+
+      const [updatedTrade] = await db
+        .update(trades)
+        .set({
+          closePrice: closeData.closePrice.toString(),
+          closeDate: closeData.closeDate,
+          wasAssigned: closeData.wasAssigned,
+          profitLoss: profitLoss.toString(),
+          isWin: profitLoss > 0,
+          returnPercentage
+        })
+        .where(eq(trades.id, tradeId))
+        .returning();
+
+      const userTrades = await db.select({
+        totalProfitLoss: sql`SUM(CAST(profit_loss AS DECIMAL))`,
+        tradeCount: sql`COUNT(*)`,
+        winCount: sql`SUM(CASE WHEN is_win THEN 1 ELSE 0 END)`,
+      }).from(trades).where(eq(trades.userId, trade.userId)).then(rows => rows[0]);
+
+      await db.update(users)
+        .set({
+          totalProfitLoss: (userTrades.totalProfitLoss || 0).toString(),
+          tradeCount: Number(userTrades.tradeCount) || 0,
+          winCount: Number(userTrades.winCount) || 0,
+          averageReturn: ((Number(userTrades.totalProfitLoss) || 0) / (Number(userTrades.tradeCount) || 1)).toString()
+        })
+        .where(eq(users.id, trade.userId));
+
+      return updatedTrade;
+    } catch (error) {
+      console.error('Error closing trade:', error);
+      throw error instanceof Error ? error : new Error("Failed to close trade");
     }
-
-    const initialCost = parseFloat(trade.premium) * trade.quantity;
-    const finalValue = closeData.closePrice * trade.quantity;
-    const profitLoss = finalValue - initialCost;
-    const returnPercentage = (profitLoss / Math.abs(initialCost) * 100).toString();
-
-    const [updatedTrade] = await db
-      .update(trades)
-      .set({
-        closePrice: closeData.closePrice.toString(),
-        closeDate: closeData.closeDate,
-        wasAssigned: closeData.wasAssigned,
-        profitLoss: profitLoss.toString(),
-        isWin: profitLoss > 0,
-        returnPercentage
-      })
-      .where(eq(trades.id, tradeId))
-      .returning();
-
-    const userTrades = await db.select({
-      totalProfitLoss: sql`SUM(profit_loss)`,
-      tradeCount: sql`COUNT(*)`,
-      winCount: sql`SUM(CASE WHEN is_win THEN 1 ELSE 0 END)`,
-    }).from(trades).where(eq(trades.userId, trade.userId)).then(rows => rows[0]);
-
-    await db.update(users)
-      .set({
-        totalProfitLoss: userTrades.totalProfitLoss?.toString() || "0",
-        tradeCount: Number(userTrades.tradeCount) || 0,
-        winCount: Number(userTrades.winCount) || 0,
-        averageReturn: (Number(userTrades.totalProfitLoss || 0) / Number(userTrades.tradeCount || 1)).toString()
-      })
-      .where(eq(users.id, trade.userId));
-
-    return updatedTrade;
   }
 }
 
