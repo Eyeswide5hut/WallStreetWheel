@@ -72,27 +72,37 @@ app.use((req, res, next) => {
     }
 
     // Use PORT from environment or fallback to 5000
-    const PORT = process.env.PORT || 5000;
-
-    // Kill any existing process on the port (development only)
-    if (app.get("env") === "development") {
-      try {
-        const { execSync } = await import('child_process');
+    const startServer = async (startPort = 5000) => {
+      const maxPort = startPort + 10; // Try up to 10 ports
+      let PORT = startPort;
+      
+      while (PORT <= maxPort) {
         try {
-          await execSync(`lsof -ti :${PORT} | xargs kill -9`);
-        } catch (killErr) {
-          // Ignore if no process to kill
+          await new Promise((resolve, reject) => {
+            server.listen(PORT, "0.0.0.0")
+              .once('listening', () => {
+                log(`Server running on port ${PORT}`);
+                resolve(true);
+              })
+              .once('error', (err) => {
+                if (err.code === 'EADDRINUSE') {
+                  server.close();
+                  PORT++;
+                  resolve(false);
+                } else {
+                  reject(err);
+                }
+              });
+          });
+          break;
+        } catch (err) {
+          console.error('Failed to start server:', err);
+          process.exit(1);
         }
-        // Wait a moment for the port to be released
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (err) {
-        console.error('Error cleaning up port:', err);
       }
-    }
+    };
 
-    server.listen(PORT, "0.0.0.0", () => {
-      log(`Server running on port ${PORT}`);
-    });
+    await startServer(parseInt(process.env.PORT || '5000'));
   } catch (err) {
     console.error('Failed to start server:', err);
     process.exit(1);
