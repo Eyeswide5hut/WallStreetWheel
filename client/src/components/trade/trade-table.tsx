@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Trade } from "@shared/schema";
 import { TradeDialog } from "./trade-dialog";
+import { Badge } from "@/components/ui/badge";
 
 export function TradeTable() {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
@@ -23,6 +24,14 @@ export function TradeTable() {
   const { data: trades } = useQuery<Trade[]>({
     queryKey: ["/api/trades"],
   });
+
+  const formatCurrency = (value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(numValue);
+  };
 
   return (
     <Card>
@@ -39,6 +48,7 @@ export function TradeTable() {
               <TableHead>Strike</TableHead>
               <TableHead>Premium</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>P/L</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -55,16 +65,30 @@ export function TradeTable() {
                 <TableCell className="capitalize">
                   {trade.optionType.replace(/_/g, ' ')}
                 </TableCell>
-                <TableCell>${trade.strikePrice}</TableCell>
-                <TableCell>${trade.premium}</TableCell>
+                <TableCell>{formatCurrency(trade.strikePrice)}</TableCell>
+                <TableCell>{formatCurrency(trade.premium)}</TableCell>
                 <TableCell>
-                  {trade.closeDate ? "Closed" : "Open"}
+                  <Badge 
+                    variant={trade.closeDate ? "secondary" : "outline"}
+                    className={trade.wasAssigned ? "bg-yellow-100 text-yellow-800" : ""}
+                  >
+                    {trade.wasAssigned ? "Assigned" : (trade.closeDate ? "Closed" : "Open")}
+                  </Badge>
+                </TableCell>
+                <TableCell className={`font-medium ${
+                  trade.profitLoss
+                    ? parseFloat(trade.profitLoss) > 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                    : ""
+                }`}>
+                  {trade.profitLoss && formatCurrency(trade.profitLoss)}
                 </TableCell>
               </TableRow>
             ))}
             {(!trades || trades.length === 0) && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No trades found
                 </TableCell>
               </TableRow>

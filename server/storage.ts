@@ -19,13 +19,17 @@ export interface IStorage {
   sessionStore: session.Store;
   updateUser(id: number, data: UpdateUser): Promise<User>;
   getTraderProfile(id: number): Promise<User | undefined>;
+  closeTrade(tradeId: number, closeData: {
+    closePrice: number;
+    closeDate: Date;
+    wasAssigned: boolean;
+  }): Promise<Trade>;
 }
 
 export class DatabaseStorage implements IStorage {
   readonly sessionStore: session.Store;
 
   constructor() {
-    // Configure session store for Neon
     const pgStoreOptions = {
       conObject: {
         connectionString: process.env.DATABASE_URL,
@@ -170,6 +174,56 @@ export class DatabaseStorage implements IStorage {
       console.error('Error retrieving trader profile:', error);
       return undefined;
     }
+  }
+
+  async closeTrade(tradeId: number, closeData: {
+    closePrice: number;
+    closeDate: Date;
+    wasAssigned: boolean;
+  }): Promise<Trade> {
+    const [trade] = await db
+      .select()
+      .from(trades)
+      .where(eq(trades.id, tradeId));
+
+    if (!trade) {
+      throw new Error("Trade not found");
+    }
+
+    const initialCost = parseFloat(trade.premium) * trade.quantity;
+    const finalValue = closeData.closePrice * trade.quantity;
+    const profitLoss = finalValue - initialCost;
+    const returnPercentage = (profitLoss / Math.abs(initialCost) * 100).toString();
+
+    const [updatedTrade] = await db
+      .update(trades)
+      .set({
+        closePrice: closeData.closePrice.toString(),
+        closeDate: closeData.closeDate,
+        wasAssigned: closeData.wasAssigned,
+        profitLoss: profitLoss.toString(),
+        isWin: profitLoss > 0,
+        returnPercentage
+      })
+      .where(eq(trades.id, tradeId))
+      .returning();
+
+    const userTrades = await db.select({
+      totalProfitLoss: sql`SUM(profit_loss)`,
+      tradeCount: sql`COUNT(*)`,
+      winCount: sql`SUM(CASE WHEN is_win THEN 1 ELSE 0 END)`,
+    }).from(trades).where(eq(trades.userId, trade.userId)).then(rows => rows[0]);
+
+    await db.update(users)
+      .set({
+        totalProfitLoss: userTrades.totalProfitLoss?.toString() || "0",
+        tradeCount: Number(userTrades.tradeCount) || 0,
+        winCount: Number(userTrades.winCount) || 0,
+        averageReturn: (Number(userTrades.totalProfitLoss || 0) / Number(userTrades.tradeCount || 1)).toString()
+      })
+      .where(eq(users.id, trade.userId));
+
+    return updatedTrade;
   }
 }
 
