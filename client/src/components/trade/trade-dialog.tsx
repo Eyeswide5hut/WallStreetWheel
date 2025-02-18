@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -187,12 +188,13 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-h-[85vh] flex flex-col p-0">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0">
         <DialogHeader className="px-6 py-4">
           <DialogTitle>
             {mode === "edit" ? "Edit Trade" : "Trade Details"}
           </DialogTitle>
         </DialogHeader>
+
         <ScrollArea className="flex-1 px-6">
           <AnimatePresence mode="wait">
             {status === 'idle' && (
@@ -201,10 +203,10 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="space-y-4 pb-6"
+                className="space-y-4 pb-16"
               >
                 {mode === "view" ? (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4 pb-16">
                     <div>
                       <h4 className="font-medium">Asset</h4>
                       <p>{trade.underlyingAsset}</p>
@@ -241,21 +243,12 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                         <p>{new Date(trade.closeDate).toLocaleDateString()}</p>
                       </div>
                     )}
-                    <div>
-                      <Button
-                        variant="destructive"
-                        onClick={handleDelete}
-                        className="w-full mt-4"
-                      >
-                        Delete Trade
-                      </Button>
-                    </div>
                   </div>
                 ) : (
                   <Form {...editForm}>
                     <form
                       onSubmit={editForm.handleSubmit((data) => editTradeMutation.mutate(data))}
-                      className="space-y-4"
+                      className="space-y-4 pb-16"
                     >
                       <FormField
                         control={editForm.control}
@@ -382,7 +375,7 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                             <FormItem className="flex flex-row items-center space-x-2 space-y-0">
                               <FormControl>
                                 <Checkbox
-                                  checked={field.value}
+                                  checked={field.value || false}
                                   onCheckedChange={field.onChange}
                                 />
                               </FormControl>
@@ -392,23 +385,6 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                             </FormItem>
                           )}
                         />
-                      </div>
-
-                      <div className="flex gap-2 sticky bottom-0 py-4 bg-background border-t">
-                        <Button
-                          type="submit"
-                          className="flex-1"
-                          disabled={editTradeMutation.isPending}
-                        >
-                          Update Trade
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          onClick={handleDelete}
-                        >
-                          Delete
-                        </Button>
                       </div>
                     </form>
                   </Form>
@@ -504,6 +480,37 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
           </AnimatePresence>
           <ScrollBar />
         </ScrollArea>
+
+        {/* Fixed footer */}
+        <DialogFooter className="border-t bg-background p-4 mt-auto">
+          {mode === "view" ? (
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              className="w-full"
+            >
+              Delete Trade
+            </Button>
+          ) : status === 'idle' && (
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                className="flex-1"
+                disabled={editTradeMutation.isPending}
+                onClick={() => editForm.handleSubmit((data) => editTradeMutation.mutate(data))()}
+              >
+                Update Trade
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+              >
+                Delete
+              </Button>
+            </div>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
