@@ -74,20 +74,14 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
       if (!trade) throw new Error("No trade selected");
 
       try {
-        const formattedData = {
-          closePrice: parseFloat(data.closePrice),
+        const res = await apiRequest("PATCH", `/api/trades/${trade.id}/close`, {
+          closePrice: data.closePrice,
           closeDate: new Date(data.closeDate),
           wasAssigned: data.wasAssigned
-        };
+        });
 
-        const response = await apiRequest(
-          "PATCH",
-          `/api/trades/${trade.id}/close`,
-          formattedData
-        );
-
-        if (!response.ok) {
-          const text = await response.text();
+        if (!res.ok) {
+          const text = await res.text();
           try {
             const error = JSON.parse(text);
             throw new Error(error.message || "Failed to close trade");
@@ -96,7 +90,7 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
           }
         }
 
-        const result = await response.json();
+        const result = await res.json();
         return result;
       } catch (error) {
         throw error instanceof Error ? error : new Error("Failed to close trade");
