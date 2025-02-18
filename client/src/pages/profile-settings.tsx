@@ -69,8 +69,6 @@ export default function ProfileSettings() {
           web: true,
         },
       },
-      marginEnabled: user?.marginEnabled || false,
-      marginRate: user?.marginRate?.toString() || null,
     },
   });
 
@@ -170,6 +168,8 @@ export default function ProfileSettings() {
           assignment: 0.0,
           exercise: 0.0,
         },
+        marginEnabled: false, //Adding default marginEnabled
+        marginRate: undefined //Adding default marginRate
       },
     ]);
   };
@@ -291,6 +291,49 @@ export default function ProfileSettings() {
                                   </FormItem>
                                 )}
                               />
+                              <FormField
+                                control={form.control}
+                                name={`platforms.${index}.marginEnabled`}
+                                render={({ field }) => (
+                                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                    <div className="space-y-0.5">
+                                      <FormLabel className="text-base">
+                                        Margin Trading
+                                      </FormLabel>
+                                      <FormDescription>
+                                        Enable margin trading for this account
+                                      </FormDescription>
+                                    </div>
+                                    <FormControl>
+                                      <Switch
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              {form.watch(`platforms.${index}.marginEnabled`) && (
+                                <FormField
+                                  control={form.control}
+                                  name={`platforms.${index}.marginRate`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Margin Interest Rate (%)</FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="Enter margin rate"
+                                          value={field.value ?? ""}
+                                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              )}
                               <div className="grid grid-cols-2 gap-4">
                                 <FormField
                                   control={form.control}

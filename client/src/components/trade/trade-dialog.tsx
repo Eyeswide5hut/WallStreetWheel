@@ -186,78 +186,92 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
                   <h4 className="font-medium">Expiration</h4>
                   <p>{new Date(trade.expirationDate).toLocaleDateString()}</p>
                 </div>
+                {trade.closePrice && (
+                  <div>
+                    <h4 className="font-medium">Close Price</h4>
+                    <p>${trade.closePrice}</p>
+                  </div>
+                )}
+                {trade.closeDate && (
+                  <div>
+                    <h4 className="font-medium">Close Date</h4>
+                    <p>{new Date(trade.closeDate).toLocaleDateString()}</p>
+                  </div>
+                )}
               </div>
 
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit((data) => closeTradeMutation.mutate(data))}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={form.control}
-                    name="closePrice"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Close Price</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="Enter closing price"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="closeDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Close Date</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="date"
-                            min={tradeDate}
-                            max={expirationDate}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="wasAssigned"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          {assignmentText}
-                        </FormLabel>
-                      </FormItem>
-                    )}
-                  />
-
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={closeTradeMutation.isPending}
+              {!trade.closeDate && (
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit((data) => closeTradeMutation.mutate(data))}
+                    className="space-y-4"
                   >
-                    Close Trade
-                  </Button>
-                </form>
-              </Form>
+                    <FormField
+                      control={form.control}
+                      name="closePrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Close Price</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="Enter closing price"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="closeDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Close Date</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              min={tradeDate}
+                              max={expirationDate}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="wasAssigned"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {getAssignmentText(trade.optionType)}
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={closeTradeMutation.isPending}
+                    >
+                      Close Trade
+                    </Button>
+                  </form>
+                </Form>
+              )}
             </motion.div>
           )}
 

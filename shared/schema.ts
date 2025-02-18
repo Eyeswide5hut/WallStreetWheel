@@ -47,8 +47,6 @@ export const users = pgTable("users", {
   email: text("email").notNull(),
   platforms: jsonb("platforms").default('[]'),
   preferences: jsonb("preferences").default('{}'),
-  marginEnabled: boolean("margin_enabled").default(false),
-  marginRate: decimal("margin_rate"),
   totalProfitLoss: decimal("total_profit_loss").default('0'),
   tradeCount: integer("trade_count").default(0),
   winCount: integer("win_count").default(0),
@@ -172,10 +170,13 @@ export const userPreferencesSchema = z.object({
   }).default({}),
 });
 
+// Platform settings schema updated to include margin configuration
 export const platformSettingsSchema = z.object({
   id: z.enum(tradingPlatforms),
   name: z.string(),
   accountId: z.string().optional(),
+  marginEnabled: z.boolean().default(false),
+  marginRate: z.number().optional(),
   feeStructure: z.object({
     perContract: z.number().default(0),
     base: z.number().default(0),
