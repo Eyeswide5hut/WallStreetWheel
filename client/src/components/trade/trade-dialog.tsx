@@ -32,6 +32,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  ScrollArea,
+  ScrollBar
+} from "@/components/ui/scroll-area";
 
 // Create a new schema for editing trades
 const editTradeSchema = z.object({
@@ -183,166 +187,130 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="max-h-[85vh] flex flex-col p-0">
+        <DialogHeader className="px-6 py-4">
           <DialogTitle>
             {mode === "edit" ? "Edit Trade" : "Trade Details"}
           </DialogTitle>
         </DialogHeader>
-        <AnimatePresence mode="wait">
-          {status === 'idle' && (
-            <motion.div
-              key="form"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-4"
-            >
-              {mode === "view" ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-medium">Asset</h4>
-                    <p>{trade.underlyingAsset}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Type</h4>
-                    <p className="capitalize">{trade.optionType.replace(/_/g, ' ')}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Strike</h4>
-                    <p>${trade.strikePrice}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Premium</h4>
-                    <p>${trade.premium}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Quantity</h4>
-                    <p>{trade.quantity}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Expiration</h4>
-                    <p>{new Date(trade.expirationDate).toLocaleDateString()}</p>
-                  </div>
-                  {trade.closePrice && (
+        <ScrollArea className="flex-1 px-6">
+          <AnimatePresence mode="wait">
+            {status === 'idle' && (
+              <motion.div
+                key="form"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-4 pb-6"
+              >
+                {mode === "view" ? (
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <h4 className="font-medium">Close Price</h4>
-                      <p>${trade.closePrice}</p>
+                      <h4 className="font-medium">Asset</h4>
+                      <p>{trade.underlyingAsset}</p>
                     </div>
-                  )}
-                  {trade.closeDate && (
                     <div>
-                      <h4 className="font-medium">Close Date</h4>
-                      <p>{new Date(trade.closeDate).toLocaleDateString()}</p>
+                      <h4 className="font-medium">Type</h4>
+                      <p className="capitalize">{trade.optionType.replace(/_/g, ' ')}</p>
                     </div>
-                  )}
-                  <div>
-                    <Button
-                      variant="destructive"
-                      onClick={handleDelete}
-                      className="w-full mt-4"
+                    <div>
+                      <h4 className="font-medium">Strike</h4>
+                      <p>${trade.strikePrice}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Premium</h4>
+                      <p>${trade.premium}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Quantity</h4>
+                      <p>{trade.quantity}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Expiration</h4>
+                      <p>{new Date(trade.expirationDate).toLocaleDateString()}</p>
+                    </div>
+                    {trade.closePrice && (
+                      <div>
+                        <h4 className="font-medium">Close Price</h4>
+                        <p>${trade.closePrice}</p>
+                      </div>
+                    )}
+                    {trade.closeDate && (
+                      <div>
+                        <h4 className="font-medium">Close Date</h4>
+                        <p>{new Date(trade.closeDate).toLocaleDateString()}</p>
+                      </div>
+                    )}
+                    <div>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDelete}
+                        className="w-full mt-4"
+                      >
+                        Delete Trade
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Form {...editForm}>
+                    <form
+                      onSubmit={editForm.handleSubmit((data) => editTradeMutation.mutate(data))}
+                      className="space-y-4"
                     >
-                      Delete Trade
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Form {...editForm}>
-                  <form
-                    onSubmit={editForm.handleSubmit((data) => editTradeMutation.mutate(data))}
-                    className="space-y-4"
-                  >
-                    <FormField
-                      control={editForm.control}
-                      name="underlyingAsset"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Underlying Asset</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={editForm.control}
-                      name="strikePrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Strike Price</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={editForm.control}
-                      name="premium"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Premium</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={editForm.control}
-                      name="quantity"
-                      render={({ field: { onChange, value, ...field } }) => (
-                        <FormItem>
-                          <FormLabel>Quantity</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={value}
-                              onChange={(e) => onChange(parseInt(e.target.value, 10))}
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={editForm.control}
-                      name="expirationDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Expiration Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Close Trade Fields */}
-                    <div className="space-y-4 pt-4 border-t">
-                      <h3 className="text-lg font-medium">Close Position Details</h3>
+                      <FormField
+                        control={editForm.control}
+                        name="underlyingAsset"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Underlying Asset</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
                       <FormField
                         control={editForm.control}
-                        name="closePrice"
+                        name="strikePrice"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Close Price</FormLabel>
+                            <FormLabel>Strike Price</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={editForm.control}
+                        name="premium"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Premium</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={editForm.control}
+                        name="quantity"
+                        render={({ field: { onChange, value, ...field } }) => (
+                          <FormItem>
+                            <FormLabel>Quantity</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
-                                step="0.01"
-                                placeholder="Enter closing price"
+                                min="1"
+                                value={value}
+                                onChange={(e) => onChange(parseInt(e.target.value, 10))}
                                 {...field}
                               />
                             </FormControl>
@@ -353,150 +321,189 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
 
                       <FormField
                         control={editForm.control}
-                        name="closeDate"
+                        name="expirationDate"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Close Date</FormLabel>
+                            <FormLabel>Expiration Date</FormLabel>
                             <FormControl>
-                              <Input
-                                type="date"
-                                min={tradeDate}
-                                max={expirationDate}
-                                {...field}
-                              />
+                              <Input type="date" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
 
-                      <FormField
-                        control={editForm.control}
-                        name="wasAssigned"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              {assignmentText}
-                            </FormLabel>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                      {/* Close Trade Fields */}
+                      <div className="space-y-4 pt-4 border-t">
+                        <h3 className="text-lg font-medium">Close Position Details</h3>
 
-                    <div className="flex gap-2">
-                      <Button
-                        type="submit"
-                        className="flex-1"
-                        disabled={editTradeMutation.isPending}
-                      >
-                        Update Trade
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        onClick={handleDelete}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              )}
-            </motion.div>
-          )}
+                        <FormField
+                          control={editForm.control}
+                          name="closePrice"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Close Price</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="Enter closing price"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-          {status === 'confirming-delete' && (
-            <motion.div
-              key="confirm-delete"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="flex flex-col items-center justify-center p-8 space-y-4"
-            >
-              <AlertTriangle className="h-16 w-16 text-yellow-500" />
-              <p className="text-lg font-medium text-center">
-                Are you sure you want to delete this trade? This action cannot be undone.
-              </p>
-              <div className="flex gap-2">
+                        <FormField
+                          control={editForm.control}
+                          name="closeDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Close Date</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="date"
+                                  min={tradeDate}
+                                  max={expirationDate}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={editForm.control}
+                          name="wasAssigned"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                {assignmentText}
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="flex gap-2 sticky bottom-0 py-4 bg-background border-t">
+                        <Button
+                          type="submit"
+                          className="flex-1"
+                          disabled={editTradeMutation.isPending}
+                        >
+                          Update Trade
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={handleDelete}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                )}
+              </motion.div>
+            )}
+
+            {status === 'confirming-delete' && (
+              <motion.div
+                key="confirm-delete"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex flex-col items-center justify-center p-8 space-y-4"
+              >
+                <AlertTriangle className="h-16 w-16 text-yellow-500" />
+                <p className="text-lg font-medium text-center">
+                  Are you sure you want to delete this trade? This action cannot be undone.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStatus('idle')}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDelete}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {status === 'submitting' && (
+              <motion.div
+                key="submitting"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex flex-col items-center justify-center p-8 space-y-4"
+              >
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p className="text-lg font-medium">Processing...</p>
+              </motion.div>
+            )}
+
+            {status === 'success' && (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex flex-col items-center justify-center p-8 space-y-4"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 10 }}
+                >
+                  <CheckCircle2 className="h-16 w-16 text-green-500" />
+                </motion.div>
+                <p className="text-lg font-medium">Operation completed successfully!</p>
+              </motion.div>
+            )}
+
+            {status === 'error' && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex flex-col items-center justify-center p-8 space-y-4"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 10 }}
+                >
+                  <XCircle className="h-16 w-16 text-red-500" />
+                </motion.div>
+                <p className="text-lg font-medium text-red-500">{errorMessage}</p>
                 <Button
                   variant="outline"
                   onClick={() => setStatus('idle')}
                 >
-                  Cancel
+                  Try Again
                 </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleDelete}
-                >
-                  Delete
-                </Button>
-              </div>
-            </motion.div>
-          )}
-
-          {status === 'submitting' && (
-            <motion.div
-              key="submitting"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="flex flex-col items-center justify-center p-8 space-y-4"
-            >
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-lg font-medium">Processing...</p>
-            </motion.div>
-          )}
-
-          {status === 'success' && (
-            <motion.div
-              key="success"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="flex flex-col items-center justify-center p-8 space-y-4"
-            >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 10 }}
-              >
-                <CheckCircle2 className="h-16 w-16 text-green-500" />
               </motion.div>
-              <p className="text-lg font-medium">Operation completed successfully!</p>
-            </motion.div>
-          )}
-
-          {status === 'error' && (
-            <motion.div
-              key="error"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="flex flex-col items-center justify-center p-8 space-y-4"
-            >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 10 }}
-              >
-                <XCircle className="h-16 w-16 text-red-500" />
-              </motion.div>
-              <p className="text-lg font-medium text-red-500">{errorMessage}</p>
-              <Button
-                variant="outline"
-                onClick={() => setStatus('idle')}
-              >
-                Try Again
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
+          <ScrollBar />
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
