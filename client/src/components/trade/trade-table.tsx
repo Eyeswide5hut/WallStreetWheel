@@ -26,6 +26,7 @@ const PAGE_SIZE = 10;
 
 export function TradeTable() {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [dialogMode, setDialogMode] = useState<"view" | "edit">("view");
   const [page, setPage] = useState(1);
   const { toast } = useToast();
 
@@ -73,6 +74,12 @@ export function TradeTable() {
   const handleEdit = (trade: Trade, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedTrade(trade);
+    setDialogMode("edit");
+  };
+
+  const handleRowClick = (trade: Trade) => {
+    setSelectedTrade(trade);
+    setDialogMode("view");
   };
 
   const totalPages = trades ? Math.ceil(trades.length / PAGE_SIZE) : 0;
@@ -109,6 +116,7 @@ export function TradeTable() {
               <TableRow
                 key={trade.id}
                 className="cursor-pointer hover:bg-muted/50"
+                onClick={() => handleRowClick(trade)}
               >
                 <TableCell>
                   {new Date(trade.tradeDate).toLocaleDateString()}
@@ -195,8 +203,11 @@ export function TradeTable() {
         <TradeDialog
           trade={selectedTrade}
           isOpen={!!selectedTrade}
-          onClose={() => setSelectedTrade(null)}
-          mode={selectedTrade?.closeDate ? "view" : "edit"}
+          onClose={() => {
+            setSelectedTrade(null);
+            setDialogMode("view");
+          }}
+          mode={dialogMode}
         />
       </CardContent>
     </Card>
