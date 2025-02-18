@@ -24,7 +24,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, AlertTriangle } from "lucide-react";
 
 const closeTradeSchema = z.object({
   closePrice: z.string().refine(val => !isNaN(parseFloat(val)), {
@@ -40,6 +40,7 @@ interface TradeDialogProps {
   trade: Trade | null;
   isOpen: boolean;
   onClose: () => void;
+  mode: "edit" | "view";
 }
 
 const getAssignmentText = (optionType: string) => {
@@ -59,9 +60,9 @@ const getAssignmentText = (optionType: string) => {
   }
 };
 
-export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
+export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) {
   const { toast } = useToast();
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error' | 'confirming-delete'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   const form = useForm<CloseTradeData>({
@@ -78,45 +79,37 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
       if (!trade) throw new Error("No trade selected");
       setStatus('submitting');
 
-      try {
-        const response = await apiRequest("PATCH", `/api/trades/${trade.id}/close`, {
-          closePrice: data.closePrice,
-          closeDate: new Date(data.closeDate).toISOString(),
-          wasAssigned: data.wasAssigned
-        });
+      const response = await apiRequest("PATCH", `/api/trades/${trade.id}/close`, {
+        closePrice: data.closePrice,
+        closeDate: new Date(data.closeDate).toISOString(),
+        wasAssigned: data.wasAssigned
+      });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          try {
-            const errorData = JSON.parse(errorText);
-            throw new Error(errorData.error || "Failed to close trade");
-          } catch {
-            throw new Error(errorText || "Failed to close trade");
-          }
-        }
-
-        const responseText = await response.text();
-        if (!responseText) {
-          throw new Error("Empty response from server");
-        }
-
+      if (!response.ok) {
+        const errorText = await response.text();
         try {
-          return JSON.parse(responseText);
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || "Failed to close trade");
         } catch {
-          throw new Error("Invalid response format from server");
+          throw new Error(errorText || "Failed to close trade");
         }
-      } catch (error) {
-        if (error instanceof Error) {
-          throw error;
-        }
-        throw new Error("An unexpected error occurred");
+      }
+
+      const responseText = await response.text();
+      if (!responseText) {
+        throw new Error("Empty response from server");
+      }
+
+      try {
+        return JSON.parse(responseText);
+      } catch {
+        throw new Error("Invalid response format from server");
       }
     },
     onSuccess: () => {
       setStatus('success');
       queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
       toast({ title: "Trade closed successfully" });
-      // Delay closing to show the success animation
       setTimeout(() => {
         setStatus('idle');
         onClose();
@@ -133,11 +126,44 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
     },
   });
 
+  const deleteTradeMutation = useMutation({
+    mutationFn: async () => {
+      if (!trade) throw new Error("No trade selected");
+      const response = await apiRequest("DELETE", `/api/trades/${trade.id}`);
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error);
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+      toast({ title: "Trade deleted successfully" });
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete trade",
+        description: error.message,
+        variant: "destructive",
+      });
+      setStatus('idle');
+    },
+  });
+
   const handleClose = () => {
-    if (status === 'submitting') return; // Prevent closing during submission
+    if (status === 'submitting') return;
     setStatus('idle');
     setErrorMessage("");
     onClose();
+  };
+
+  const handleDelete = () => {
+    if (status === 'confirming-delete') {
+      deleteTradeMutation.mutate();
+    } else {
+      setStatus('confirming-delete');
+    }
   };
 
   if (!trade) return null;
@@ -150,7 +176,9 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Close Trade</DialogTitle>
+          <DialogTitle>
+            {mode === "view" ? "Trade Details" : "Close Trade"}
+          </DialogTitle>
         </DialogHeader>
         <AnimatePresence mode="wait">
           {status === 'idle' && (
@@ -200,7 +228,7 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
                 )}
               </div>
 
-              {!trade.closeDate && (
+              {mode === "edit" && !trade.closeDate && (
                 <Form {...form}>
                   <form
                     onSubmit={form.handleSubmit((data) => closeTradeMutation.mutate(data))}
@@ -256,22 +284,72 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
                             />
                           </FormControl>
                           <FormLabel className="font-normal">
-                            {getAssignmentText(trade.optionType)}
+                            {assignmentText}
                           </FormLabel>
                         </FormItem>
                       )}
                     />
 
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={closeTradeMutation.isPending}
-                    >
-                      Close Trade
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="submit"
+                        className="flex-1"
+                        disabled={closeTradeMutation.isPending}
+                      >
+                        Close Trade
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={handleDelete}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </form>
                 </Form>
               )}
+
+              {mode === "view" && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="destructive"
+                    onClick={handleDelete}
+                    className="w-full"
+                  >
+                    Delete Trade
+                  </Button>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {status === 'confirming-delete' && (
+            <motion.div
+              key="confirm-delete"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="flex flex-col items-center justify-center p-8 space-y-4"
+            >
+              <AlertTriangle className="h-16 w-16 text-yellow-500" />
+              <p className="text-lg font-medium text-center">
+                Are you sure you want to delete this trade? This action cannot be undone.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setStatus('idle')}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                >
+                  Delete
+                </Button>
+              </div>
             </motion.div>
           )}
 
