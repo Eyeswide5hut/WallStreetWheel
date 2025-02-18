@@ -25,21 +25,20 @@ export function OverviewCards() {
 
   const totalTrades = trades?.length || 0;
 
-  // A trade is profitable if premium is positive (credit trades) or if it's a completed debit trade
+  // Calculate profitable trades based on closed P&L
   const profitableTrades = trades?.filter(t => {
-    const premium = Number(t.premium);
-    if (creditOptionTypes.includes(t.optionType as any)) {
-      return premium > 0; // Credit trades are profitable when premium is positive
-    } else if (debitOptionTypes.includes(t.optionType as any)) {
-      return premium < 0; // Debit trades show as negative premium (cost)
-    }
-    return premium > 0; // For spreads, positive premium means profitable
+    if (!t.closeDate) return false;
+    const profitLoss = Number(t.profitLoss || 0);
+    return profitLoss > 0;
   }).length || 0;
 
   const winRate = totalTrades ? (profitableTrades / totalTrades * 100).toFixed(1) : "0";
 
-  // Total P/L is the sum of all premiums (already stored as positive for credits and negative for debits)
-  const totalPremium = trades?.reduce((sum, t) => sum + Number(t.premium), 0) || 0;
+  // Total P/L is the sum of realized profits/losses from closed trades
+  const totalPnL = trades?.reduce((sum, t) => {
+    if (!t.closeDate) return sum;
+    return sum + Number(t.profitLoss || 0);
+  }, 0) || 0;
 
   return (
     <div className="grid gap-4 md:grid-cols-4">
