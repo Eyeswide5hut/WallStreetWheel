@@ -25,11 +25,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 const closeTradeSchema = z.object({
-  closePrice: z.string().transform(val => {
-    const num = parseFloat(val);
-    if (isNaN(num)) throw new Error("Invalid price");
-    return num;
-  }),
+  closePrice: z.string().refine(val => !isNaN(parseFloat(val)), {
+    message: "Close price must be a valid number"
+  }).transform(val => parseFloat(val)),
   closeDate: z.string(),
   wasAssigned: z.boolean().default(false),
 });
