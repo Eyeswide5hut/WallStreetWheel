@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Trade } from "@shared/schema";
+import { Trade, insertTradeSchema, type InsertTrade } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -25,6 +25,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, XCircle, Loader2, AlertTriangle } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const closeTradeSchema = z.object({
   closePrice: z.string().refine(val => !isNaN(parseFloat(val)), {
@@ -34,7 +41,21 @@ const closeTradeSchema = z.object({
   wasAssigned: z.boolean().default(false),
 });
 
+// Create a new schema for editing trades
+const editTradeSchema = z.object({
+  id: z.number(),
+  underlyingAsset: z.string().min(1).optional(),
+  optionType: z.string().optional(),
+  strikePrice: z.string().optional(),
+  premium: z.string().optional(),
+  quantity: z.number().int().positive().optional(),
+  expirationDate: z.string().optional(),
+  platform: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 type CloseTradeData = z.infer<typeof closeTradeSchema>;
+type EditTradeData = z.infer<typeof editTradeSchema>;
 
 interface TradeDialogProps {
   trade: Trade | null;
@@ -65,12 +86,64 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error' | 'confirming-delete'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  const form = useForm<CloseTradeData>({
+  const closeForm = useForm<CloseTradeData>({
     resolver: zodResolver(closeTradeSchema),
     defaultValues: {
       closePrice: "",
       closeDate: new Date().toISOString().split('T')[0],
       wasAssigned: false,
+    },
+  });
+
+  const editForm = useForm<EditTradeData>({
+    resolver: zodResolver(editTradeSchema),
+    defaultValues: trade ? {
+      id: trade.id,
+      underlyingAsset: trade.underlyingAsset,
+      optionType: trade.optionType,
+      strikePrice: trade.strikePrice?.toString(),
+      premium: trade.premium.toString(),
+      quantity: trade.quantity,
+      expirationDate: new Date(trade.expirationDate).toISOString().split('T')[0],
+      platform: trade.platform,
+      notes: trade.notes,
+    } : {},
+  });
+
+  const editTradeMutation = useMutation({
+    mutationFn: async (data: EditTradeData) => {
+      setStatus('submitting');
+      const response = await apiRequest("PATCH", `/api/trades/${data.id}`, data);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || "Failed to update trade");
+        } catch {
+          throw new Error(errorText || "Failed to update trade");
+        }
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      setStatus('success');
+      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+      toast({ title: "Trade updated successfully" });
+      setTimeout(() => {
+        setStatus('idle');
+        onClose();
+      }, 1500);
+    },
+    onError: (error: Error) => {
+      setStatus('error');
+      setErrorMessage(error.message);
+      toast({
+        title: "Failed to update trade",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -177,7 +250,7 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {mode === "view" ? "Trade Details" : "Close Trade"}
+            {mode === "edit" ? "Edit Trade" : "Trade Details"}
           </DialogTitle>
         </DialogHeader>
         <AnimatePresence mode="wait">
@@ -189,53 +262,165 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
               exit={{ opacity: 0 }}
               className="space-y-4"
             >
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-medium">Asset</h4>
-                  <p>{trade.underlyingAsset}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Type</h4>
-                  <p className="capitalize">{trade.optionType.replace(/_/g, ' ')}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Strike</h4>
-                  <p>${trade.strikePrice}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Premium</h4>
-                  <p>${trade.premium}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Quantity</h4>
-                  <p>{trade.quantity}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Expiration</h4>
-                  <p>{new Date(trade.expirationDate).toLocaleDateString()}</p>
-                </div>
-                {trade.closePrice && (
+              {mode === "view" ? (
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="font-medium">Close Price</h4>
-                    <p>${trade.closePrice}</p>
+                    <h4 className="font-medium">Asset</h4>
+                    <p>{trade.underlyingAsset}</p>
                   </div>
-                )}
-                {trade.closeDate && (
                   <div>
-                    <h4 className="font-medium">Close Date</h4>
-                    <p>{new Date(trade.closeDate).toLocaleDateString()}</p>
+                    <h4 className="font-medium">Type</h4>
+                    <p className="capitalize">{trade.optionType.replace(/_/g, ' ')}</p>
                   </div>
-                )}
-              </div>
-
-              {mode === "edit" && !trade.closeDate && (
-                <Form {...form}>
+                  <div>
+                    <h4 className="font-medium">Strike</h4>
+                    <p>${trade.strikePrice}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Premium</h4>
+                    <p>${trade.premium}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Quantity</h4>
+                    <p>{trade.quantity}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Expiration</h4>
+                    <p>{new Date(trade.expirationDate).toLocaleDateString()}</p>
+                  </div>
+                  {trade.closePrice && (
+                    <div>
+                      <h4 className="font-medium">Close Price</h4>
+                      <p>${trade.closePrice}</p>
+                    </div>
+                  )}
+                  {trade.closeDate && (
+                    <div>
+                      <h4 className="font-medium">Close Date</h4>
+                      <p>{new Date(trade.closeDate).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                  <div>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDelete}
+                      className="w-full mt-4"
+                    >
+                      Delete Trade
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Form {...editForm}>
                   <form
-                    onSubmit={form.handleSubmit((data) => closeTradeMutation.mutate(data))}
+                    onSubmit={editForm.handleSubmit((data) => editTradeMutation.mutate(data))}
                     className="space-y-4"
                   >
                     <FormField
-                      control={form.control}
+                      control={editForm.control}
+                      name="underlyingAsset"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Underlying Asset</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="strikePrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Strike Price</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="premium"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Premium</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="quantity"
+                      render={({ field: { onChange, value, ...field } }) => (
+                        <FormItem>
+                          <FormLabel>Quantity</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={value}
+                              onChange={(e) => onChange(parseInt(e.target.value, 10))}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="expirationDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Expiration Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="submit"
+                        className="flex-1"
+                        disabled={editTradeMutation.isPending}
+                      >
+                        Update Trade
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={handleDelete}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              )}
+
+              {!trade.closeDate && mode === "edit" && (
+                <Form {...closeForm}>
+                  <form
+                    onSubmit={closeForm.handleSubmit((data) => closeTradeMutation.mutate(data))}
+                    className="space-y-4 mt-4 pt-4 border-t"
+                  >
+                    <h3 className="text-lg font-medium">Close Position</h3>
+                    <FormField
+                      control={closeForm.control}
                       name="closePrice"
                       render={({ field }) => (
                         <FormItem>
@@ -254,7 +439,7 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                     />
 
                     <FormField
-                      control={form.control}
+                      control={closeForm.control}
                       name="closeDate"
                       render={({ field }) => (
                         <FormItem>
@@ -273,7 +458,7 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                     />
 
                     <FormField
-                      control={form.control}
+                      control={closeForm.control}
                       name="wasAssigned"
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-center space-x-2 space-y-0">
@@ -290,36 +475,16 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                       )}
                     />
 
-                    <div className="flex gap-2">
-                      <Button
-                        type="submit"
-                        className="flex-1"
-                        disabled={closeTradeMutation.isPending}
-                      >
-                        Close Trade
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        onClick={handleDelete}
-                      >
-                        Delete
-                      </Button>
-                    </div>
+                    <Button
+                      type="submit"
+                      variant="secondary"
+                      className="w-full"
+                      disabled={closeTradeMutation.isPending}
+                    >
+                      Close Trade
+                    </Button>
                   </form>
                 </Form>
-              )}
-
-              {mode === "view" && (
-                <div className="flex gap-2">
-                  <Button
-                    variant="destructive"
-                    onClick={handleDelete}
-                    className="w-full"
-                  >
-                    Delete Trade
-                  </Button>
-                </div>
               )}
             </motion.div>
           )}
@@ -362,7 +527,7 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
               className="flex flex-col items-center justify-center p-8 space-y-4"
             >
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-lg font-medium">Processing trade closure...</p>
+              <p className="text-lg font-medium">Processing...</p>
             </motion.div>
           )}
 
@@ -381,7 +546,7 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
               >
                 <CheckCircle2 className="h-16 w-16 text-green-500" />
               </motion.div>
-              <p className="text-lg font-medium">Trade closed successfully!</p>
+              <p className="text-lg font-medium">Operation completed successfully!</p>
             </motion.div>
           )}
 
