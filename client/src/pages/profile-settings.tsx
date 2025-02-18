@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { updateUserSchema, tradingPlatforms, platformSettingsSchema, type UpdateUser, type SharePosition, insertSharePositionSchema } from "@shared/schema";
+import { updateUserSchema, insertSharePositionSchema, tradingPlatforms, platformSettingsSchema, type UpdateUser, type SharePosition } from "@shared/schema";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -78,11 +78,10 @@ export default function ProfileSettings() {
       symbol: "",
       quantity: 0,
       averageCost: 0,
-      userId: user?.id,
+      userId: user?.id || 0,
     },
   });
 
-  // Query share positions
   const { data: sharePositions, isLoading: loadingPositions } = useQuery<SharePosition[]>({
     queryKey: ["/api/share-positions"],
   });
@@ -119,11 +118,20 @@ export default function ProfileSettings() {
 
   const addSharePositionMutation = useMutation({
     mutationFn: async (data: typeof insertSharePositionSchema._type) => {
+      if (!user?.id) throw new Error("User ID is required");
+
       const formattedData = {
-        ...data,
-        userId: user?.id, // Ensure userId is included
+        symbol: data.symbol.toUpperCase(),
+        quantity: Number(data.quantity),
+        averageCost: Number(data.averageCost),
+        userId: user.id,
       };
+
       const res = await apiRequest("POST", "/api/share-positions", formattedData);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to add share position");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -133,7 +141,7 @@ export default function ProfileSettings() {
         symbol: "",
         quantity: 0,
         averageCost: 0,
-        userId: user?.id,
+        userId: user?.id || 0,
       });
     },
     onError: (error: Error) => {
@@ -178,8 +186,8 @@ export default function ProfileSettings() {
           assignment: 0.0,
           exercise: 0.0,
         },
-        marginEnabled: false, 
-        marginRate: undefined 
+        marginEnabled: false,
+        marginRate: undefined
       },
     ]);
   };
@@ -389,17 +397,9 @@ export default function ProfileSettings() {
                     </div>
 
 
-                    <div> {/*This div was added to keep the structure same as original*/}
-                    </div>
-
-
-                    <div> {/*This div was added to keep the structure same as original*/}
-                    </div>
-
-
-                    <div> {/*This div was added to keep the structure same as original*/}
-                    </div>
-
+                    <div> </div>
+                    <div> </div>
+                    <div> </div>
                   </div>
 
                   <Button
@@ -478,7 +478,17 @@ export default function ProfileSettings() {
                   <CardContent>
                     <Form {...shareForm}>
                       <form
-                        onSubmit={shareForm.handleSubmit((data) => addSharePositionMutation.mutate(data))}
+                        onSubmit={shareForm.handleSubmit((data) => {
+                          if (!user?.id) {
+                            toast({
+                              title: "Error",
+                              description: "You must be logged in to add positions",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          addSharePositionMutation.mutate(data);
+                        })}
                         className="space-y-4"
                       >
                         <FormField
@@ -505,7 +515,7 @@ export default function ProfileSettings() {
                                   <Input
                                     type="number"
                                     {...field}
-                                    onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                    onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
                                   />
                                 </FormControl>
                                 <FormMessage />
@@ -523,7 +533,7 @@ export default function ProfileSettings() {
                                     type="number"
                                     step="0.01"
                                     {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                                   />
                                 </FormControl>
                                 <FormMessage />
