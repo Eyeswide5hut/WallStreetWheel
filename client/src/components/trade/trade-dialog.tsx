@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Trade, insertTradeSchema, type InsertTrade } from "@shared/schema";
+import { Trade, type InsertTrade } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -33,14 +33,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const closeTradeSchema = z.object({
-  closePrice: z.string().refine(val => !isNaN(parseFloat(val)), {
-    message: "Close price must be a valid number"
-  }).transform(val => parseFloat(val)),
-  closeDate: z.string(),
-  wasAssigned: z.boolean().default(false),
-});
-
 // Create a new schema for editing trades
 const editTradeSchema = z.object({
   id: z.number(),
@@ -52,9 +44,11 @@ const editTradeSchema = z.object({
   expirationDate: z.string().optional(),
   platform: z.string().optional(),
   notes: z.string().optional(),
+  closeDate: z.string().optional(),
+  closePrice: z.string().optional(),
+  wasAssigned: z.boolean().optional(),
 });
 
-type CloseTradeData = z.infer<typeof closeTradeSchema>;
 type EditTradeData = z.infer<typeof editTradeSchema>;
 
 interface TradeDialogProps {
@@ -86,15 +80,6 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error' | 'confirming-delete'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  const closeForm = useForm<CloseTradeData>({
-    resolver: zodResolver(closeTradeSchema),
-    defaultValues: {
-      closePrice: "",
-      closeDate: new Date().toISOString().split('T')[0],
-      wasAssigned: false,
-    },
-  });
-
   const editForm = useForm<EditTradeData>({
     resolver: zodResolver(editTradeSchema),
     values: trade ? {
@@ -107,6 +92,9 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
       expirationDate: new Date(trade.expirationDate).toISOString().split('T')[0],
       platform: trade.platform ?? undefined,
       notes: trade.notes ?? undefined,
+      closeDate: trade.closeDate ? new Date(trade.closeDate).toISOString().split('T')[0] : undefined,
+      closePrice: trade.closePrice?.toString() ?? undefined,
+      wasAssigned: trade.wasAssigned,
     } : undefined,
   });
 
@@ -141,58 +129,6 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
       setErrorMessage(error.message);
       toast({
         title: "Failed to update trade",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const closeTradeMutation = useMutation({
-    mutationFn: async (data: CloseTradeData) => {
-      if (!trade) throw new Error("No trade selected");
-      setStatus('submitting');
-
-      const response = await apiRequest("PATCH", `/api/trades/${trade.id}/close`, {
-        closePrice: data.closePrice,
-        closeDate: new Date(data.closeDate).toISOString(),
-        wasAssigned: data.wasAssigned
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        try {
-          const errorData = JSON.parse(errorText);
-          throw new Error(errorData.error || "Failed to close trade");
-        } catch {
-          throw new Error(errorText || "Failed to close trade");
-        }
-      }
-
-      const responseText = await response.text();
-      if (!responseText) {
-        throw new Error("Empty response from server");
-      }
-
-      try {
-        return JSON.parse(responseText);
-      } catch {
-        throw new Error("Invalid response format from server");
-      }
-    },
-    onSuccess: () => {
-      setStatus('success');
-      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
-      toast({ title: "Trade closed successfully" });
-      setTimeout(() => {
-        setStatus('idle');
-        onClose();
-      }, 1500);
-    },
-    onError: (error: Error) => {
-      setStatus('error');
-      setErrorMessage(error.message);
-      toast({
-        title: "Failed to close trade",
         description: error.message,
         variant: "destructive",
       });
@@ -392,6 +328,67 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                       )}
                     />
 
+                    {/* Close Trade Fields */}
+                    <div className="space-y-4 pt-4 border-t">
+                      <h3 className="text-lg font-medium">Close Position Details</h3>
+
+                      <FormField
+                        control={editForm.control}
+                        name="closePrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Close Price</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="Enter closing price"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={editForm.control}
+                        name="closeDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Close Date</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                min={tradeDate}
+                                max={expirationDate}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={editForm.control}
+                        name="wasAssigned"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              {assignmentText}
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
                     <div className="flex gap-2">
                       <Button
                         type="submit"
@@ -408,81 +405,6 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                         Delete
                       </Button>
                     </div>
-                  </form>
-                </Form>
-              )}
-
-              {!trade.closeDate && mode === "edit" && (
-                <Form {...closeForm}>
-                  <form
-                    onSubmit={closeForm.handleSubmit((data) => closeTradeMutation.mutate(data))}
-                    className="space-y-4 mt-4 pt-4 border-t"
-                  >
-                    <h3 className="text-lg font-medium">Close Position</h3>
-                    <FormField
-                      control={closeForm.control}
-                      name="closePrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Close Price</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="Enter closing price"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={closeForm.control}
-                      name="closeDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Close Date</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="date"
-                              min={tradeDate}
-                              max={expirationDate}
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={closeForm.control}
-                      name="wasAssigned"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {assignmentText}
-                          </FormLabel>
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button
-                      type="submit"
-                      variant="secondary"
-                      className="w-full"
-                      disabled={closeTradeMutation.isPending}
-                    >
-                      Close Trade
-                    </Button>
                   </form>
                 </Form>
               )}
