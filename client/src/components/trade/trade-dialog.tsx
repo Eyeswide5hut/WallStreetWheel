@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Trade, type InsertTrade } from "@shared/schema";
+import { Trade } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -26,19 +26,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, XCircle, Loader2, AlertTriangle } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  ScrollArea,
-  ScrollBar
-} from "@/components/ui/scroll-area";
 
-// Create a new schema for editing trades
+// Existing schema definition remains unchanged
 const editTradeSchema = z.object({
   id: z.number(),
   underlyingAsset: z.string().min(1).optional(),
@@ -103,6 +92,7 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
     } : undefined,
   });
 
+  // Rest of the mutation handlers remain unchanged
   const editTradeMutation = useMutation({
     mutationFn: async (data: EditTradeData) => {
       setStatus('submitting');
@@ -188,14 +178,14 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0">
-        <DialogHeader className="px-6 py-4">
-          <DialogTitle>
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0">
+        <DialogHeader className="flex-none p-6 border-b">
+          <DialogTitle className="text-xl">
             {mode === "edit" ? "Edit Trade" : "Trade Details"}
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6">
+        <div className="flex-1 min-h-0 p-6 overflow-y-auto">
           <AnimatePresence mode="wait">
             {status === 'idle' && (
               <motion.div
@@ -203,52 +193,53 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="space-y-4 pb-16"
               >
                 {mode === "view" ? (
-                  <div className="grid grid-cols-2 gap-4 pb-16">
-                    <div>
-                      <h4 className="font-medium">Asset</h4>
-                      <p>{trade.underlyingAsset}</p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Type</h4>
-                      <p className="capitalize">{trade.optionType.replace(/_/g, ' ')}</p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Strike</h4>
-                      <p>${trade.strikePrice}</p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Premium</h4>
-                      <p>${trade.premium}</p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Quantity</h4>
-                      <p>{trade.quantity}</p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Expiration</h4>
-                      <p>{new Date(trade.expirationDate).toLocaleDateString()}</p>
-                    </div>
-                    {trade.closePrice && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <h4 className="font-medium">Close Price</h4>
-                        <p>${trade.closePrice}</p>
+                        <h4 className="font-medium">Asset</h4>
+                        <p>{trade.underlyingAsset}</p>
                       </div>
-                    )}
-                    {trade.closeDate && (
                       <div>
-                        <h4 className="font-medium">Close Date</h4>
-                        <p>{new Date(trade.closeDate).toLocaleDateString()}</p>
+                        <h4 className="font-medium">Type</h4>
+                        <p className="capitalize">{trade.optionType.replace(/_/g, ' ')}</p>
                       </div>
-                    )}
+                      <div>
+                        <h4 className="font-medium">Strike</h4>
+                        <p>${trade.strikePrice}</p>
+                      </div>
+                      <div>
+                        <h4 className="font-medium">Premium</h4>
+                        <p>${trade.premium}</p>
+                      </div>
+                      <div>
+                        <h4 className="font-medium">Quantity</h4>
+                        <p>{trade.quantity}</p>
+                      </div>
+                      <div>
+                        <h4 className="font-medium">Expiration</h4>
+                        <p>{new Date(trade.expirationDate).toLocaleDateString()}</p>
+                      </div>
+                      {trade.closePrice && (
+                        <div>
+                          <h4 className="font-medium">Close Price</h4>
+                          <p>${trade.closePrice}</p>
+                        </div>
+                      )}
+                      {trade.closeDate && (
+                        <div>
+                          <h4 className="font-medium">Close Date</h4>
+                          <p>{new Date(trade.closeDate).toLocaleDateString()}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <Form {...editForm}>
                     <form
                       onSubmit={editForm.handleSubmit((data) => editTradeMutation.mutate(data))}
-                      className="space-y-4 pb-16"
+                      className="space-y-6"
                     >
                       <FormField
                         control={editForm.control}
@@ -327,7 +318,7 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                       />
 
                       {/* Close Trade Fields */}
-                      <div className="space-y-4 pt-4 border-t">
+                      <div className="space-y-6 pt-6 border-t">
                         <h3 className="text-lg font-medium">Close Position Details</h3>
 
                         <FormField
@@ -372,16 +363,18 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
                           control={editForm.control}
                           name="wasAssigned"
                           render={({ field }) => (
-                            <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                               <FormControl>
                                 <Checkbox
                                   checked={field.value || false}
                                   onCheckedChange={field.onChange}
                                 />
                               </FormControl>
-                              <FormLabel className="font-normal">
-                                {assignmentText}
-                              </FormLabel>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>
+                                  {assignmentText}
+                                </FormLabel>
+                              </div>
                             </FormItem>
                           )}
                         />
@@ -395,10 +388,10 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
             {status === 'confirming-delete' && (
               <motion.div
                 key="confirm-delete"
-                initial={{ opacity: 0, scale: 0.8 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="flex flex-col items-center justify-center p-8 space-y-4"
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex flex-col items-center justify-center space-y-4"
               >
                 <AlertTriangle className="h-16 w-16 text-yellow-500" />
                 <p className="text-lg font-medium text-center">
@@ -424,10 +417,10 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
             {status === 'submitting' && (
               <motion.div
                 key="submitting"
-                initial={{ opacity: 0, scale: 0.8 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="flex flex-col items-center justify-center p-8 space-y-4"
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex flex-col items-center justify-center space-y-4"
               >
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 <p className="text-lg font-medium">Processing...</p>
@@ -437,10 +430,10 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
             {status === 'success' && (
               <motion.div
                 key="success"
-                initial={{ opacity: 0, scale: 0.8 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="flex flex-col items-center justify-center p-8 space-y-4"
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex flex-col items-center justify-center space-y-4"
               >
                 <motion.div
                   initial={{ scale: 0 }}
@@ -456,10 +449,10 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
             {status === 'error' && (
               <motion.div
                 key="error"
-                initial={{ opacity: 0, scale: 0.8 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="flex flex-col items-center justify-center p-8 space-y-4"
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex flex-col items-center justify-center space-y-4"
               >
                 <motion.div
                   initial={{ scale: 0 }}
@@ -478,11 +471,9 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
               </motion.div>
             )}
           </AnimatePresence>
-          <ScrollBar />
-        </ScrollArea>
+        </div>
 
-        {/* Fixed footer */}
-        <DialogFooter className="border-t bg-background p-4 mt-auto">
+        <DialogFooter className="flex-none border-t p-6 bg-background">
           {mode === "view" ? (
             <Button
               variant="destructive"
@@ -492,7 +483,7 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
               Delete Trade
             </Button>
           ) : status === 'idle' && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full">
               <Button
                 type="submit"
                 className="flex-1"
