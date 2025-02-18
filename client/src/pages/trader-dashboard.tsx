@@ -7,18 +7,20 @@ import { Loader2 } from "lucide-react";
 
 export default function TraderDashboard() {
   const params = useParams<{ id: string }>();
-  const id = params?.id;
+  const traderId = params?.id ? parseInt(params.id) : null;
 
   const { data: trader, isLoading, error } = useQuery<User>({
-    queryKey: ["/api/traders", id],
-    queryFn: () => {
-      if (!id) throw new Error('Trader ID is required');
-      return fetch(`/api/traders/${id}`).then(res => {
-        if (!res.ok) throw new Error('Failed to fetch trader details');
-        return res.json();
-      });
+    queryKey: ["/api/traders", traderId],
+    queryFn: async () => {
+      if (!traderId) throw new Error('Trader ID is required');
+      const response = await fetch(`/api/traders/${traderId}`);
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error);
+      }
+      return response.json();
     },
-    enabled: !!id,
+    enabled: !!traderId,
   });
 
   if (isLoading) {
@@ -39,7 +41,9 @@ export default function TraderDashboard() {
         <main className="container mx-auto px-4 py-8">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-destructive">Trader not found</h2>
-            <p className="text-muted-foreground mt-2">The trader profile you're looking for doesn't exist.</p>
+            <p className="text-muted-foreground mt-2">
+              The trader profile you're looking for doesn't exist or there was an error loading it.
+            </p>
           </div>
         </main>
       </div>
@@ -61,7 +65,7 @@ export default function TraderDashboard() {
                 <CardTitle>Total P/L</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-mono">
+                <p className={`text-2xl font-mono ${parseFloat(trader.totalProfitLoss?.toString() || '0') >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   ${parseFloat(trader.totalProfitLoss?.toString() || '0').toFixed(2)}
                 </p>
               </CardContent>
