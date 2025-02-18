@@ -73,28 +73,26 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
     mutationFn: async (data: CloseTradeData) => {
       if (!trade) throw new Error("No trade selected");
 
-      try {
-        const res = await apiRequest("PATCH", `/api/trades/${trade.id}/close`, {
-          closePrice: data.closePrice,
-          closeDate: new Date(data.closeDate),
-          wasAssigned: data.wasAssigned
-        });
+      const response = await apiRequest("PATCH", `/api/trades/${trade.id}/close`, {
+        closePrice: data.closePrice,
+        closeDate: new Date(data.closeDate),
+        wasAssigned: data.wasAssigned
+      });
 
-        if (!res.ok) {
-          const text = await res.text();
-          try {
-            const error = JSON.parse(text);
-            throw new Error(error.message || "Failed to close trade");
-          } catch {
-            throw new Error(text || "Failed to close trade");
-          }
+      if (!response.ok) {
+        // Try to parse error as JSON first
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to close trade");
+        } else {
+          // Fallback to text if not JSON
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to close trade");
         }
-
-        const result = await res.json();
-        return result;
-      } catch (error) {
-        throw error instanceof Error ? error : new Error("Failed to close trade");
       }
+
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
