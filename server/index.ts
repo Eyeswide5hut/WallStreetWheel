@@ -77,15 +77,16 @@ app.use((req, res, next) => {
     // Kill any existing process on the port (development only)
     if (app.get("env") === "development") {
       try {
-        await new Promise((resolve, reject) => {
-          const { exec } = require('child_process');
-          exec(`lsof -ti :${PORT} | xargs kill -9`, (error: any) => {
-            // Ignore errors since the port might not be in use
-            resolve(null);
-          });
-        });
+        const { execSync } = require('child_process');
+        try {
+          execSync(`lsof -ti :${PORT} | xargs kill -9`);
+        } catch (killErr) {
+          // Ignore if no process to kill
+        }
+        // Wait a moment for the port to be released
+        await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (err) {
-        // Ignore kill errors
+        console.error('Error cleaning up port:', err);
       }
     }
 
