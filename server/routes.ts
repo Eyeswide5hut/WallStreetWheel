@@ -150,9 +150,17 @@ export function registerRoutes(app: Express): Server {
       // Calculate derived metrics
       const winRate = trader.tradeCount ? (trader.winCount || 0) / trader.tradeCount : 0;
 
-      // Return trader with calculated metrics
+      // Return trader with calculated metrics, excluding sensitive data
       res.json({
-        ...trader,
+        id: trader.id,
+        username: trader.username,
+        totalProfitLoss: trader.totalProfitLoss,
+        tradeCount: trader.tradeCount,
+        winCount: trader.winCount,
+        averageReturn: trader.averageReturn,
+        platforms: trader.platforms,
+        preferences: trader.preferences,
+        rank: trader.rank,
         winRate
       });
     } catch (error) {

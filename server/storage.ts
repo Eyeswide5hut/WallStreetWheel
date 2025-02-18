@@ -157,14 +157,14 @@ export class DatabaseStorage implements IStorage {
           id: users.id,
           username: users.username,
           email: users.email,
+          password: users.password,
           totalProfitLoss: users.totalProfitLoss,
           tradeCount: users.tradeCount,
           winCount: users.winCount,
           averageReturn: users.averageReturn,
           platforms: users.platforms,
           preferences: users.preferences,
-          marginEnabled: users.marginEnabled,
-          marginRate: users.marginRate,
+          rank: users.rank,
           createdAt: users.createdAt,
           updatedAt: users.updatedAt
         })
@@ -250,8 +250,8 @@ export class DatabaseStorage implements IStorage {
             sharesAssigned = 100 * quantity;
             assignmentPrice = strikePrice;
             // P/L = Premium + (Market Price - Strike Price) * Shares
-            profitLoss = (premium * quantity * 100) + 
-                        ((closeData.closePrice - strikePrice) * sharesAssigned);
+            profitLoss = (premium * quantity * 100) +
+              ((closeData.closePrice - strikePrice) * sharesAssigned);
             break;
           }
           case "long_call": {
@@ -259,8 +259,8 @@ export class DatabaseStorage implements IStorage {
             sharesAssigned = 100 * quantity;
             assignmentPrice = strikePrice;
             // P/L = (Market Price - Strike Price) * Shares - Premium
-            profitLoss = ((closeData.closePrice - strikePrice) * sharesAssigned) - 
-                        (premium * quantity * 100);
+            profitLoss = ((closeData.closePrice - strikePrice) * sharesAssigned) -
+              (premium * quantity * 100);
             break;
           }
           case "long_put": {
@@ -268,8 +268,8 @@ export class DatabaseStorage implements IStorage {
             sharesAssigned = -100 * quantity;
             assignmentPrice = strikePrice;
             // P/L = (Strike Price - Market Price) * Shares - Premium
-            profitLoss = ((strikePrice - closeData.closePrice) * Math.abs(sharesAssigned)) - 
-                        (premium * quantity * 100);
+            profitLoss = ((strikePrice - closeData.closePrice) * Math.abs(sharesAssigned)) -
+              (premium * quantity * 100);
             break;
           }
           default:
@@ -283,15 +283,15 @@ export class DatabaseStorage implements IStorage {
           case "naked_call":
           case "naked_put": {
             // Short options: profit = premium received - cost to close
-            profitLoss = (premium * quantity * 100) - 
-                        (closeData.closePrice * quantity * 100);
+            profitLoss = (premium * quantity * 100) -
+              (closeData.closePrice * quantity * 100);
             break;
           }
           case "long_call":
           case "long_put": {
             // Long options: profit = sale price - premium paid
-            profitLoss = (closeData.closePrice * quantity * 100) - 
-                        (premium * quantity * 100);
+            profitLoss = (closeData.closePrice * quantity * 100) -
+              (premium * quantity * 100);
             break;
           }
           default:
