@@ -78,6 +78,7 @@ export default function ProfileSettings() {
       symbol: "",
       quantity: 0,
       averageCost: 0,
+      userId: user?.id,
     },
   });
 
@@ -118,13 +119,22 @@ export default function ProfileSettings() {
 
   const addSharePositionMutation = useMutation({
     mutationFn: async (data: typeof insertSharePositionSchema._type) => {
-      const res = await apiRequest("POST", "/api/share-positions", data);
+      const formattedData = {
+        ...data,
+        userId: user?.id, // Ensure userId is included
+      };
+      const res = await apiRequest("POST", "/api/share-positions", formattedData);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/share-positions"] });
       toast({ title: "Share position added successfully" });
-      shareForm.reset();
+      shareForm.reset({
+        symbol: "",
+        quantity: 0,
+        averageCost: 0,
+        userId: user?.id,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -168,8 +178,8 @@ export default function ProfileSettings() {
           assignment: 0.0,
           exercise: 0.0,
         },
-        marginEnabled: false, //Adding default marginEnabled
-        marginRate: undefined //Adding default marginRate
+        marginEnabled: false, 
+        marginRate: undefined 
       },
     ]);
   };
@@ -378,50 +388,18 @@ export default function ProfileSettings() {
                       ))}
                     </div>
 
-                    <FormField
-                      control={form.control}
-                      name="marginEnabled"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">
-                              Margin Trading
-                            </FormLabel>
-                            <FormDescription>
-                              Enable margin trading and set your margin rate
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value ?? false}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
 
-                    {form.watch("marginEnabled") && (
-                      <FormField
-                        control={form.control}
-                        name="marginRate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Margin Interest Rate (%)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="Enter your margin rate"
-                                value={field.value ?? ""}
-                                onChange={(e) => field.onChange(e.target.value ? e.target.value.toString() : null)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
+                    <div> {/*This div was added to keep the structure same as original*/}
+                    </div>
+
+
+                    <div> {/*This div was added to keep the structure same as original*/}
+                    </div>
+
+
+                    <div> {/*This div was added to keep the structure same as original*/}
+                    </div>
+
                   </div>
 
                   <Button
