@@ -97,17 +97,17 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
 
   const editForm = useForm<EditTradeData>({
     resolver: zodResolver(editTradeSchema),
-    defaultValues: trade ? {
+    values: trade ? {
       id: trade.id,
       underlyingAsset: trade.underlyingAsset,
       optionType: trade.optionType,
-      strikePrice: trade.strikePrice?.toString(),
-      premium: trade.premium.toString(),
+      strikePrice: trade.strikePrice?.toString() ?? "",
+      premium: trade.premium?.toString() ?? "",
       quantity: trade.quantity,
       expirationDate: new Date(trade.expirationDate).toISOString().split('T')[0],
-      platform: trade.platform,
-      notes: trade.notes,
-    } : {},
+      platform: trade.platform ?? undefined,
+      notes: trade.notes ?? undefined,
+    } : undefined,
   });
 
   const editTradeMutation = useMutation({
