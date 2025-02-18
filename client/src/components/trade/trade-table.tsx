@@ -17,11 +17,16 @@ import {
 import { Trade } from "@shared/schema";
 import { TradeDialog } from "./trade-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
+const PAGE_SIZE = 10;
 
 export function TradeTable() {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [page, setPage] = useState(1);
 
-  const { data: trades } = useQuery<Trade[]>({
+  const { data: trades, isLoading } = useQuery<Trade[]>({
     queryKey: ["/api/trades"],
   });
 
@@ -33,10 +38,14 @@ export function TradeTable() {
     }).format(numValue);
   };
 
+  const totalPages = trades ? Math.ceil(trades.length / PAGE_SIZE) : 0;
+  const startIndex = (page - 1) * PAGE_SIZE;
+  const paginatedTrades = trades?.slice(startIndex, startIndex + PAGE_SIZE);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Trades</CardTitle>
+        <CardTitle>Trading History</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
@@ -52,7 +61,13 @@ export function TradeTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {trades?.slice(0, 5).map((trade) => (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-4">
+                  Loading trades...
+                </TableCell>
+              </TableRow>
+            ) : paginatedTrades?.map((trade) => (
               <TableRow
                 key={trade.id}
                 className="cursor-pointer hover:bg-muted/50"
@@ -95,6 +110,34 @@ export function TradeTable() {
             )}
           </TableBody>
         </Table>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <div className="text-sm text-muted-foreground">
+              Page {page} of {totalPages}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         <TradeDialog
           trade={selectedTrade}
