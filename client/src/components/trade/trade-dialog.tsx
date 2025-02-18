@@ -80,23 +80,26 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
           wasAssigned: data.wasAssigned
         });
 
-        const contentType = response.headers.get("content-type");
         if (!response.ok) {
-          if (contentType?.includes("application/json")) {
-            const errorData = await response.json();
+          const errorText = await response.text();
+          try {
+            const errorData = JSON.parse(errorText);
             throw new Error(errorData.message || "Failed to close trade");
-          } else {
-            const errorText = await response.text();
-            throw new Error("Failed to close trade: Server error");
+          } catch {
+            throw new Error(errorText || "Failed to close trade");
           }
         }
 
-        // Ensure we have JSON response
-        if (!contentType?.includes("application/json")) {
-          throw new Error("Invalid server response format");
+        const responseText = await response.text();
+        if (!responseText) {
+          throw new Error("Empty response from server");
         }
 
-        return response.json();
+        try {
+          return JSON.parse(responseText);
+        } catch {
+          throw new Error("Invalid response format from server");
+        }
       } catch (error) {
         if (error instanceof Error) {
           throw error;
