@@ -195,6 +195,19 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Trade is already closed");
       }
 
+      // Validate close date is between trade date and expiration
+      const closeDate = new Date(closeData.closeDate);
+      const tradeDate = new Date(trade.tradeDate);
+      const expirationDate = new Date(trade.expirationDate);
+
+      if (closeDate < tradeDate) {
+        throw new Error("Close date cannot be before trade open date");
+      }
+
+      if (closeDate > expirationDate) {
+        throw new Error("Close date cannot be after expiration date");
+      }
+
       const initialCost = parseFloat(trade.premium) * trade.quantity;
       const finalValue = closeData.closePrice * trade.quantity;
       const profitLoss = finalValue - initialCost;

@@ -84,7 +84,7 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
           const errorText = await response.text();
           try {
             const errorData = JSON.parse(errorText);
-            throw new Error(errorData.message || "Failed to close trade");
+            throw new Error(errorData.error || "Failed to close trade");
           } catch {
             throw new Error(errorText || "Failed to close trade");
           }
@@ -124,6 +124,8 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
   if (!trade) return null;
 
   const assignmentText = getAssignmentText(trade.optionType);
+  const tradeDate = new Date(trade.tradeDate).toISOString().split('T')[0];
+  const expirationDate = new Date(trade.expirationDate).toISOString().split('T')[0];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -192,7 +194,8 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
                     <FormControl>
                       <Input
                         type="date"
-                        max={new Date().toISOString().split('T')[0]}
+                        min={tradeDate}
+                        max={expirationDate}
                         {...field}
                       />
                     </FormControl>
