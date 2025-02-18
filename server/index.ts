@@ -77,9 +77,9 @@ app.use((req, res, next) => {
     // Kill any existing process on the port (development only)
     if (app.get("env") === "development") {
       try {
-        const { execSync } = require('child_process');
+        const { execSync } = await import('child_process');
         try {
-          execSync(`lsof -ti :${PORT} | xargs kill -9`);
+          await execSync(`lsof -ti :${PORT} | xargs kill -9`);
         } catch (killErr) {
           // Ignore if no process to kill
         }
