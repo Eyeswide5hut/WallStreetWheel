@@ -38,6 +38,23 @@ interface TradeDialogProps {
   onClose: () => void;
 }
 
+const getAssignmentText = (optionType: string) => {
+  switch (optionType) {
+    case "covered_call":
+      return "Shares were called away";
+    case "cash_secured_put":
+      return "Shares were assigned";
+    case "naked_call":
+    case "naked_put":
+      return "Option was assigned";
+    case "long_call":
+    case "long_put":
+      return "Option was exercised";
+    default:
+      return "Option was assigned";
+  }
+};
+
 export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
   const { toast } = useToast();
 
@@ -76,11 +93,13 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
 
   if (!trade) return null;
 
+  const assignmentText = getAssignmentText(trade.optionType);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Trade Details</DialogTitle>
+          <DialogTitle>Close Trade</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -166,7 +185,7 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
                       />
                     </FormControl>
                     <FormLabel className="font-normal">
-                      Trade was assigned
+                      {assignmentText}
                     </FormLabel>
                   </FormItem>
                 )}
