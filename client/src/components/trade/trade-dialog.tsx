@@ -25,8 +25,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 const closeTradeSchema = z.object({
-  closePrice: z.string().transform((val) => parseFloat(val)),
-  closeDate: z.string().transform((val) => new Date(val)),
+  closePrice: z.number().or(z.string()).transform(val => 
+    typeof val === 'string' ? parseFloat(val) : val
+  ),
+  closeDate: z.string().transform(val => new Date(val)),
   wasAssigned: z.boolean().default(false),
 });
 
@@ -61,7 +63,7 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
   const form = useForm<CloseTradeData>({
     resolver: zodResolver(closeTradeSchema),
     defaultValues: {
-      closePrice: "",
+      closePrice: 0,
       closeDate: new Date().toISOString().split('T')[0],
       wasAssigned: false,
     },
@@ -137,7 +139,7 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
               <FormField
                 control={form.control}
                 name="closePrice"
-                render={({ field }) => (
+                render={({ field: { value, onChange, ...field } }) => (
                   <FormItem>
                     <FormLabel>Close Price</FormLabel>
                     <FormControl>
@@ -145,6 +147,8 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
                         type="number"
                         step="0.01"
                         placeholder="Enter closing price"
+                        value={value}
+                        onChange={(e) => onChange(parseFloat(e.target.value))}
                         {...field}
                       />
                     </FormControl>
@@ -156,15 +160,13 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
               <FormField
                 control={form.control}
                 name="closeDate"
-                render={({ field: { value, onChange, ...field } }) => (
+                render={({ field }) => (
                   <FormItem>
                     <FormLabel>Close Date</FormLabel>
                     <FormControl>
                       <Input
                         type="date"
                         max={new Date().toISOString().split('T')[0]}
-                        value={typeof value === 'object' ? value.toISOString().split('T')[0] : value}
-                        onChange={(e) => onChange(e.target.value)}
                         {...field}
                       />
                     </FormControl>
