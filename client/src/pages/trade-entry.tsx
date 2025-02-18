@@ -1,6 +1,6 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertTradeSchema, optionTypes, spreadOptionTypes, debitOptionTypes, creditOptionTypes } from "@shared/schema";
+import { insertTradeSchema, optionTypes, spreadOptionTypes, debitOptionTypes, creditOptionTypes, type PlatformSettings } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +49,12 @@ type FormData = {
   }>;
 };
 
+type AuthUser = {
+  id: number;
+  username: string;
+  platforms: PlatformSettings[];
+};
+
 const defaultLegData = {
   optionType: debitOptionTypes[0],
   strikePrice: "",
@@ -61,6 +67,7 @@ export default function TradeEntry() {
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
   const { user } = useAuth();
+  const typedUser = user as AuthUser;
 
   const form = useForm<FormData>({
     resolver: zodResolver(insertTradeSchema),
@@ -117,7 +124,7 @@ export default function TradeEntry() {
   });
 
   const calculateFees = (platform: string, quantity: number, premium: string) => {
-    const platformSettings = user?.platforms?.find(p => p.id === platform);
+    const platformSettings = typedUser?.platforms?.find(p => p.id === platform);
     if (!platformSettings) return 0;
 
     const premiumValue = parseFloat(premium) || 0;
@@ -174,9 +181,10 @@ export default function TradeEntry() {
                         field.onChange(value);
                         // Reset legs when changing strategy
                         form.setValue("legs", []);
-                        if (spreadOptionTypes.includes(value)) {
+                        const strategyType = value as typeof spreadOptionTypes[number];
+                        if (spreadOptionTypes.includes(strategyType)) {
                           // Add default legs based on strategy
-                          switch (value) {
+                          switch (strategyType) {
                             case "call_spread":
                             case "put_spread":
                               appendLeg(defaultLegData);
@@ -191,7 +199,7 @@ export default function TradeEntry() {
                             case "butterfly":
                               appendLeg(defaultLegData); // Buy 1
                               appendLeg({ ...defaultLegData, side: "sell", quantity: 2 }); // Sell 2
-                              appendLeg({ ...defaultLegData }); // Buy 1
+                              appendLeg(defaultLegData); // Buy 1
                               break;
                           }
                         }
@@ -422,7 +430,7 @@ export default function TradeEntry() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {user?.platforms?.map((platform) => (
+                          {typedUser?.platforms?.map((platform) => (
                             <SelectItem key={platform.id} value={platform.id}>
                               {platform.name}
                               {platform.accountId ? ` - Account #${platform.accountId}` : ''}

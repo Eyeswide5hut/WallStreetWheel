@@ -90,6 +90,9 @@ export const trades = pgTable("trades", {
   profitLoss: decimal("profit_loss"),
   isWin: boolean("is_win"),
   returnPercentage: decimal("return_percentage"),
+  closeDate: timestamp("close_date"),
+  closePrice: decimal("close_price"),
+  wasAssigned: boolean("was_assigned").default(false),
 });
 
 export const insertUserSchema = createInsertSchema(users)
