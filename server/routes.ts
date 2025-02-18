@@ -5,6 +5,13 @@ import { storage } from "./storage";
 import { insertTradeSchema, updateUserSchema, leaderboardMetricSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { ZodError } from "zod";
+import { z } from "zod";
+
+const closeTradeSchema = z.object({
+  closePrice: z.number(),
+  closeDate: z.string().transform(str => new Date(str)),
+  wasAssigned: z.boolean()
+});
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -51,6 +58,41 @@ export function registerRoutes(app: Express): Server {
     const trades = await storage.getUserTrades(req.user!.id);
     res.json(trades);
   });
+
+  app.patch("/api/trades/:id/close", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    try {
+      const tradeId = parseInt(req.params.id);
+      if (isNaN(tradeId)) {
+        return res.status(400).json({ error: "Invalid trade ID" });
+      }
+
+      const validatedData = closeTradeSchema.parse(req.body);
+      const trade = await storage.getTrade(tradeId);
+
+      if (!trade) {
+        return res.status(404).json({ error: "Trade not found" });
+      }
+
+      if (trade.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Not authorized to close this trade" });
+      }
+
+      const updatedTrade = await storage.closeTrade(tradeId, validatedData);
+      res.json(updatedTrade);
+    } catch (error) {
+      console.error('Trade close error:', error);
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: fromZodError(error).message });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : "Failed to close trade" });
+      }
+    }
+  });
+
 
   // Leaderboard routes
   app.get("/api/leaderboard", async (req, res) => {
