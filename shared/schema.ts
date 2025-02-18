@@ -72,6 +72,24 @@ const optionLegSchema = z.object({
   quantity: z.number().int().positive()
 });
 
+export const sharePositions = pgTable("share_positions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  quantity: integer("quantity").notNull(),
+  averageCost: decimal("average_cost").notNull(),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  acquisitionHistory: jsonb("acquisition_history").default('[]'), // Array of acquisition events including options assignments
+});
+
+// Add share position schema
+export const insertSharePositionSchema = createInsertSchema(sharePositions)
+  .omit({ id: true, lastUpdated: true })
+  .extend({
+    quantity: z.number().int(),
+    averageCost: z.number().positive(),
+  });
+
 export const trades = pgTable("trades", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -93,6 +111,9 @@ export const trades = pgTable("trades", {
   closeDate: timestamp("close_date"),
   closePrice: decimal("close_price"),
   wasAssigned: boolean("was_assigned").default(false),
+  sharesAssigned: integer("shares_assigned"), // Number of shares assigned/called away
+  assignmentPrice: decimal("assignment_price"), // Price at which shares were assigned/called
+  affectedSharePositionId: integer("affected_share_position_id"), // Reference to the share position affected
 });
 
 export const insertUserSchema = createInsertSchema(users)
@@ -131,6 +152,8 @@ export const insertTradeSchema = createInsertSchema(trades)
       if (isNaN(date.getTime())) throw new Error("Invalid expiration date");
       return date;
     }),
+    sharesAssigned: z.number().int().optional(),
+    assignmentPrice: basePremiumSchema.optional(),
   }).superRefine((data, ctx) => {
     // Transform premium based on option type
     if (debitOptionTypes.includes(data.optionType as typeof debitOptionTypes[number])) {
@@ -181,6 +204,8 @@ export type Trade = typeof trades.$inferSelect;
 export type UpdateUser = z.infer<typeof updateUserSchema>;
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
+export type SharePosition = typeof sharePositions.$inferSelect;
+export type InsertSharePosition = z.infer<typeof insertSharePositionSchema>;
 
 export type LeaderboardMetric = "totalProfitLoss" | "winRate" | "tradeCount" | "averageReturn";
 

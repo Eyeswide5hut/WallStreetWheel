@@ -1,4 +1,4 @@
-import { type InsertUser, type User, type Trade, type InsertTrade, users, trades } from "@shared/schema";
+import { type InsertUser, type User, type Trade, type InsertTrade, users, trades, sharePositions, type SharePosition, type InsertSharePosition } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import session from "express-session";
@@ -24,6 +24,9 @@ export interface IStorage {
     closeDate: Date;
     wasAssigned: boolean;
   }): Promise<Trade>;
+  getSharePositions(userId: number): Promise<SharePosition[]>;
+  updateSharePosition(userId: number, symbol: string, quantity: number, cost: number): Promise<SharePosition>;
+  createSharePosition(userId: number, position: InsertSharePosition): Promise<SharePosition>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -208,11 +211,56 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Close date cannot be after expiration date");
       }
 
-      const initialCost = parseFloat(trade.premium) * trade.quantity;
-      const finalValue = closeData.closePrice * trade.quantity;
-      const profitLoss = finalValue - initialCost;
-      const returnPercentage = (profitLoss / Math.abs(initialCost) * 100).toString();
+      let profitLoss: number;
+      let sharesAssigned = 0;
+      let assignmentPrice = null;
+      let affectedSharePositionId = null;
 
+      // Calculate P/L based on option type and assignment status
+      const premium = parseFloat(trade.premium.toString());
+      const quantity = trade.quantity;
+      const strikePrice = parseFloat(trade.strikePrice?.toString() || '0');
+
+      if (closeData.wasAssigned) {
+        // Handle assignment cases
+        switch (trade.optionType) {
+          case "covered_call": {
+            // Shares are called away at strike price
+            sharesAssigned = -100 * quantity; // Negative because shares are called away
+            assignmentPrice = strikePrice;
+
+            // Find existing share position
+            const [sharePosition] = await db
+              .select()
+              .from(sharePositions)
+              .where(sql`user_id = ${trade.userId} AND symbol = ${trade.underlyingAsset}`);
+
+            if (!sharePosition || sharePosition.quantity < Math.abs(sharesAssigned)) {
+              throw new Error("Insufficient shares for covered call assignment");
+            }
+
+            // P/L = (Strike Price - Average Cost) * Shares + Premium
+            profitLoss = ((strikePrice - parseFloat(sharePosition.averageCost.toString())) * Math.abs(sharesAssigned)) + (premium * quantity * 100);
+            affectedSharePositionId = sharePosition.id;
+            break;
+          }
+          case "cash_secured_put": {
+            // Shares are assigned at strike price
+            sharesAssigned = 100 * quantity;
+            assignmentPrice = strikePrice;
+            profitLoss = premium * quantity * 100; // Initial P/L is just the premium
+            break;
+          }
+          // Add other cases as needed
+          default:
+            profitLoss = premium * quantity * 100;
+        }
+      } else {
+        // Regular close without assignment
+        profitLoss = ((closeData.closePrice - strikePrice) * quantity * 100) + (premium * quantity * 100);
+      }
+
+      // Update the trade
       const [updatedTrade] = await db
         .update(trades)
         .set({
@@ -221,31 +269,124 @@ export class DatabaseStorage implements IStorage {
           wasAssigned: closeData.wasAssigned,
           profitLoss: profitLoss.toString(),
           isWin: profitLoss > 0,
-          returnPercentage
+          returnPercentage: ((profitLoss / Math.abs(premium * quantity * 100)) * 100).toString(),
+          sharesAssigned,
+          assignmentPrice: assignmentPrice?.toString(),
+          affectedSharePositionId
         })
         .where(eq(trades.id, tradeId))
         .returning();
 
-      const userTrades = await db.select({
-        totalProfitLoss: sql`SUM(CAST(profit_loss AS DECIMAL))`,
-        tradeCount: sql`COUNT(*)`,
-        winCount: sql`SUM(CASE WHEN is_win THEN 1 ELSE 0 END)`,
-      }).from(trades).where(eq(trades.userId, trade.userId)).then(rows => rows[0]);
+      // Update share positions if assignment occurred
+      if (closeData.wasAssigned && sharesAssigned !== 0) {
+        await this.updateSharePosition(
+          trade.userId,
+          trade.underlyingAsset,
+          sharesAssigned,
+          assignmentPrice || 0
+        );
+      }
 
-      await db.update(users)
-        .set({
-          totalProfitLoss: (userTrades.totalProfitLoss || 0).toString(),
-          tradeCount: Number(userTrades.tradeCount) || 0,
-          winCount: Number(userTrades.winCount) || 0,
-          averageReturn: ((Number(userTrades.totalProfitLoss) || 0) / (Number(userTrades.tradeCount) || 1)).toString()
-        })
-        .where(eq(users.id, trade.userId));
+      // Update user statistics
+      await this.updateUserStats(trade.userId);
 
       return updatedTrade;
     } catch (error) {
       console.error('Error closing trade:', error);
       throw error instanceof Error ? error : new Error("Failed to close trade");
     }
+  }
+
+  private async updateUserStats(userId: number) {
+    const userTrades = await db.select({
+      totalProfitLoss: sql`SUM(CAST(profit_loss AS DECIMAL))`,
+      tradeCount: sql`COUNT(*)`,
+      winCount: sql`SUM(CASE WHEN is_win THEN 1 ELSE 0 END)`,
+    }).from(trades).where(eq(trades.userId, userId)).then(rows => rows[0]);
+
+    await db.update(users)
+      .set({
+        totalProfitLoss: (userTrades.totalProfitLoss || 0).toString(),
+        tradeCount: Number(userTrades.tradeCount) || 0,
+        winCount: Number(userTrades.winCount) || 0,
+        averageReturn: ((Number(userTrades.totalProfitLoss) || 0) / (Number(userTrades.tradeCount) || 1)).toString()
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async getSharePositions(userId: number): Promise<SharePosition[]> {
+    return db
+      .select()
+      .from(sharePositions)
+      .where(eq(sharePositions.userId, userId));
+  }
+
+  async updateSharePosition(userId: number, symbol: string, quantityChange: number, price: number): Promise<SharePosition> {
+    const [existingPosition] = await db
+      .select()
+      .from(sharePositions)
+      .where(sql`user_id = ${userId} AND symbol = ${symbol}`);
+
+    if (existingPosition) {
+      const newQuantity = existingPosition.quantity + quantityChange;
+      const oldCost = parseFloat(existingPosition.averageCost.toString()) * existingPosition.quantity;
+      const newCost = price * Math.abs(quantityChange);
+      const newAverageCost = newQuantity !== 0 ? ((oldCost + newCost) / newQuantity).toString() : '0';
+
+      const [updatedPosition] = await db
+        .update(sharePositions)
+        .set({
+          quantity: newQuantity,
+          averageCost: newAverageCost,
+          lastUpdated: new Date(),
+          acquisitionHistory: sql`jsonb_array_append(acquisition_history, ${JSON.stringify({
+            date: new Date(),
+            quantity: quantityChange,
+            price: price,
+            type: quantityChange > 0 ? 'assignment' : 'called_away'
+          })})`
+        })
+        .where(eq(sharePositions.id, existingPosition.id))
+        .returning();
+
+      return updatedPosition;
+    } else {
+      const [newPosition] = await db
+        .insert(sharePositions)
+        .values({
+          userId,
+          symbol,
+          quantity: quantityChange,
+          averageCost: price.toString(),
+          acquisitionHistory: JSON.stringify([{
+            date: new Date(),
+            quantity: quantityChange,
+            price: price,
+            type: 'assignment'
+          }])
+        })
+        .returning();
+
+      return newPosition;
+    }
+  }
+
+  async createSharePosition(userId: number, position: InsertSharePosition): Promise<SharePosition> {
+    const [newPosition] = await db
+      .insert(sharePositions)
+      .values({
+        ...position,
+        userId,
+        acquisitionHistory: JSON.stringify([{
+          date: new Date(),
+          quantity: position.quantity,
+          price: parseFloat(position.averageCost.toString()),
+          type: 'manual_entry'
+        }])
+      })
+      .returning();
+
+    return newPosition;
   }
 }
 
