@@ -23,6 +23,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
 const closeTradeSchema = z.object({
   closePrice: z.string().refine(val => !isNaN(parseFloat(val)), {
@@ -59,6 +61,8 @@ const getAssignmentText = (optionType: string) => {
 
 export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
   const { toast } = useToast();
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   const form = useForm<CloseTradeData>({
     resolver: zodResolver(closeTradeSchema),
@@ -72,6 +76,7 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
   const closeTradeMutation = useMutation({
     mutationFn: async (data: CloseTradeData) => {
       if (!trade) throw new Error("No trade selected");
+      setStatus('submitting');
 
       try {
         const response = await apiRequest("PATCH", `/api/trades/${trade.id}/close`, {
@@ -108,11 +113,18 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
       }
     },
     onSuccess: () => {
+      setStatus('success');
       queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
       toast({ title: "Trade closed successfully" });
-      onClose();
+      // Delay closing to show the success animation
+      setTimeout(() => {
+        setStatus('idle');
+        onClose();
+      }, 1500);
     },
     onError: (error: Error) => {
+      setStatus('error');
+      setErrorMessage(error.message);
       toast({
         title: "Failed to close trade",
         description: error.message,
@@ -121,6 +133,13 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
     },
   });
 
+  const handleClose = () => {
+    if (status === 'submitting') return; // Prevent closing during submission
+    setStatus('idle');
+    setErrorMessage("");
+    onClose();
+  };
+
   if (!trade) return null;
 
   const assignmentText = getAssignmentText(trade.optionType);
@@ -128,110 +147,177 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
   const expirationDate = new Date(trade.expirationDate).toISOString().split('T')[0];
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Close Trade</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h4 className="font-medium">Asset</h4>
-              <p>{trade.underlyingAsset}</p>
-            </div>
-            <div>
-              <h4 className="font-medium">Type</h4>
-              <p className="capitalize">{trade.optionType.replace(/_/g, ' ')}</p>
-            </div>
-            <div>
-              <h4 className="font-medium">Strike</h4>
-              <p>${trade.strikePrice}</p>
-            </div>
-            <div>
-              <h4 className="font-medium">Premium</h4>
-              <p>${trade.premium}</p>
-            </div>
-            <div>
-              <h4 className="font-medium">Quantity</h4>
-              <p>{trade.quantity}</p>
-            </div>
-            <div>
-              <h4 className="font-medium">Expiration</h4>
-              <p>{new Date(trade.expirationDate).toLocaleDateString()}</p>
-            </div>
-          </div>
-
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit((data) => closeTradeMutation.mutate(data))}
+        <AnimatePresence mode="wait">
+          {status === 'idle' && (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="space-y-4"
             >
-              <FormField
-                control={form.control}
-                name="closePrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Close Price</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="Enter closing price"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium">Asset</h4>
+                  <p>{trade.underlyingAsset}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Type</h4>
+                  <p className="capitalize">{trade.optionType.replace(/_/g, ' ')}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Strike</h4>
+                  <p>${trade.strikePrice}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Premium</h4>
+                  <p>${trade.premium}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Quantity</h4>
+                  <p>{trade.quantity}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Expiration</h4>
+                  <p>{new Date(trade.expirationDate).toLocaleDateString()}</p>
+                </div>
+              </div>
 
-              <FormField
-                control={form.control}
-                name="closeDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Close Date</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        min={tradeDate}
-                        max={expirationDate}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit((data) => closeTradeMutation.mutate(data))}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={form.control}
+                    name="closePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Close Price</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Enter closing price"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <FormField
-                control={form.control}
-                name="wasAssigned"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <FormLabel className="font-normal">
-                      {assignmentText}
-                    </FormLabel>
-                  </FormItem>
-                )}
-              />
+                  <FormField
+                    control={form.control}
+                    name="closeDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Close Date</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            min={tradeDate}
+                            max={expirationDate}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={closeTradeMutation.isPending}
+                  <FormField
+                    control={form.control}
+                    name="wasAssigned"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {assignmentText}
+                        </FormLabel>
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={closeTradeMutation.isPending}
+                  >
+                    Close Trade
+                  </Button>
+                </form>
+              </Form>
+            </motion.div>
+          )}
+
+          {status === 'submitting' && (
+            <motion.div
+              key="submitting"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="flex flex-col items-center justify-center p-8 space-y-4"
+            >
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <p className="text-lg font-medium">Processing trade closure...</p>
+            </motion.div>
+          )}
+
+          {status === 'success' && (
+            <motion.div
+              key="success"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="flex flex-col items-center justify-center p-8 space-y-4"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 10 }}
               >
-                Close Trade
+                <CheckCircle2 className="h-16 w-16 text-green-500" />
+              </motion.div>
+              <p className="text-lg font-medium">Trade closed successfully!</p>
+            </motion.div>
+          )}
+
+          {status === 'error' && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="flex flex-col items-center justify-center p-8 space-y-4"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 10 }}
+              >
+                <XCircle className="h-16 w-16 text-red-500" />
+              </motion.div>
+              <p className="text-lg font-medium text-red-500">{errorMessage}</p>
+              <Button
+                variant="outline"
+                onClick={() => setStatus('idle')}
+              >
+                Try Again
               </Button>
-            </form>
-          </Form>
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </DialogContent>
     </Dialog>
   );
