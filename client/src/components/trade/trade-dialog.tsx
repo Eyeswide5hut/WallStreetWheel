@@ -28,7 +28,11 @@ const closeTradeSchema = z.object({
   closePrice: z.number().or(z.string()).transform(val => 
     typeof val === 'string' ? parseFloat(val) : val
   ),
-  closeDate: z.string().transform(val => new Date(val)),
+  closeDate: z.string().transform(val => {
+    const date = new Date(val);
+    if (isNaN(date.getTime())) throw new Error("Invalid date");
+    return date;
+  }),
   wasAssigned: z.boolean().default(false),
 });
 
@@ -71,12 +75,25 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
 
   const closeTradeMutation = useMutation({
     mutationFn: async (data: CloseTradeData) => {
-      if (!trade) return;
+      if (!trade) throw new Error("No trade selected");
+
+      const formattedData = {
+        closePrice: parseFloat(data.closePrice.toString()),
+        closeDate: data.closeDate,
+        wasAssigned: data.wasAssigned
+      };
+
       const response = await apiRequest(
         "PATCH",
         `/api/trades/${trade.id}/close`,
-        data
+        formattedData
       );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
+
       return response.json();
     },
     onSuccess: () => {
