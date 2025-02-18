@@ -65,8 +65,8 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Total P/L</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${totalPremium >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            ${totalPremium.toFixed(2)}
+          <div className={`text-2xl font-bold ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            ${totalPnL.toFixed(2)}
           </div>
         </CardContent>
       </Card>
