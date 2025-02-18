@@ -25,14 +25,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 const closeTradeSchema = z.object({
-  closePrice: z.number().or(z.string()).transform(val => 
-    typeof val === 'string' ? parseFloat(val) : val
-  ),
-  closeDate: z.string().transform(val => {
-    const date = new Date(val);
-    if (isNaN(date.getTime())) throw new Error("Invalid date");
-    return date;
+  closePrice: z.string().transform(val => {
+    const num = parseFloat(val);
+    if (isNaN(num)) throw new Error("Invalid price");
+    return num;
   }),
+  closeDate: z.string(),
   wasAssigned: z.boolean().default(false),
 });
 
@@ -67,7 +65,7 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
   const form = useForm<CloseTradeData>({
     resolver: zodResolver(closeTradeSchema),
     defaultValues: {
-      closePrice: 0,
+      closePrice: "",
       closeDate: new Date().toISOString().split('T')[0],
       wasAssigned: false,
     },
@@ -77,24 +75,34 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
     mutationFn: async (data: CloseTradeData) => {
       if (!trade) throw new Error("No trade selected");
 
-      const formattedData = {
-        closePrice: parseFloat(data.closePrice.toString()),
-        closeDate: data.closeDate,
-        wasAssigned: data.wasAssigned
-      };
+      try {
+        const formattedData = {
+          closePrice: parseFloat(data.closePrice),
+          closeDate: new Date(data.closeDate),
+          wasAssigned: data.wasAssigned
+        };
 
-      const response = await apiRequest(
-        "PATCH",
-        `/api/trades/${trade.id}/close`,
-        formattedData
-      );
+        const response = await apiRequest(
+          "PATCH",
+          `/api/trades/${trade.id}/close`,
+          formattedData
+        );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText);
+        if (!response.ok) {
+          const text = await response.text();
+          try {
+            const error = JSON.parse(text);
+            throw new Error(error.message || "Failed to close trade");
+          } catch {
+            throw new Error(text || "Failed to close trade");
+          }
+        }
+
+        const result = await response.json();
+        return result;
+      } catch (error) {
+        throw error instanceof Error ? error : new Error("Failed to close trade");
       }
-
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
@@ -156,7 +164,7 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
               <FormField
                 control={form.control}
                 name="closePrice"
-                render={({ field: { value, onChange, ...field } }) => (
+                render={({ field }) => (
                   <FormItem>
                     <FormLabel>Close Price</FormLabel>
                     <FormControl>
@@ -164,8 +172,6 @@ export function TradeDialog({ trade, isOpen, onClose }: TradeDialogProps) {
                         type="number"
                         step="0.01"
                         placeholder="Enter closing price"
-                        value={value}
-                        onChange={(e) => onChange(parseFloat(e.target.value))}
                         {...field}
                       />
                     </FormControl>
