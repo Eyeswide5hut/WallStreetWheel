@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertTradeSchema, updateUserSchema, leaderboardMetricSchema } from "@shared/schema";
+import { insertTradeSchema, updateUserSchema, leaderboardMetricSchema, insertSharePositionSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { ZodError } from "zod";
 import { z } from "zod";
@@ -158,6 +158,36 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Trader profile error:', error);
       res.status(500).json({ error: "Failed to fetch trader profile" });
+    }
+  });
+
+  // Share Position routes
+  app.post("/api/share-positions", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const validatedPosition = insertSharePositionSchema.parse(req.body);
+      const position = await storage.createSharePosition(req.user!.id, validatedPosition);
+      res.status(201).json(position);
+    } catch (error) {
+      console.error('Share position creation error:', error);
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: fromZodError(error).message });
+      } else {
+        res.status(400).json({ error: "Invalid share position data" });
+      }
+    }
+  });
+
+  app.get("/api/share-positions", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const positions = await storage.getSharePositions(req.user!.id);
+      res.json(positions);
+    } catch (error) {
+      console.error('Error fetching share positions:', error);
+      res.status(500).json({ error: "Failed to fetch share positions" });
     }
   });
 
