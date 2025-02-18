@@ -105,7 +105,14 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Trader not found" });
       }
 
-      res.json(trader);
+      // Calculate derived metrics
+      const winRate = trader.tradeCount ? (trader.winCount || 0) / trader.tradeCount : 0;
+
+      // Return trader with calculated metrics
+      res.json({
+        ...trader,
+        winRate
+      });
     } catch (error) {
       console.error('Trader profile error:', error);
       res.status(500).json({ error: "Failed to fetch trader profile" });
