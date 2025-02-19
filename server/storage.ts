@@ -10,6 +10,26 @@ import { type UpdateUser } from "@shared/schema";
 
 const PostgresSessionStore = connectPg(session);
 
+export interface IStorage {
+  sessionStore: session.Store;
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  createTrade(userId: number, trade: InsertTrade): Promise<Trade>;
+  getUserTrades(userId: number): Promise<Trade[]>;
+  getTrade(id: number): Promise<Trade | undefined>;
+  updateUser(id: number, data: UpdateUser): Promise<User>;
+  getTraderProfile(id: number): Promise<User | undefined>;
+  createTransaction(userId: number, transaction: InsertTransaction): Promise<AccountTransaction>;
+  getUserTransactions(userId: number): Promise<AccountTransaction[]>;
+  getUserBalance(userId: number): Promise<{
+    currentBalance: string;
+    totalDeposited: string;
+    totalWithdrawn: string;
+    totalCapitalUsed: string;
+  }>;
+}
+
 export class DatabaseStorage implements IStorage {
   readonly sessionStore: session.Store;
 
@@ -23,6 +43,29 @@ export class DatabaseStorage implements IStorage {
     };
 
     this.sessionStore = new PostgresSessionStore(pgStoreOptions);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    try {
+      const [user] = await db.insert(users)
+        .values({
+          ...insertUser,
+          currentBalance: '0',
+          totalDeposited: '0',
+          totalWithdrawn: '0',
+          totalCapitalUsed: '0',
+          totalProfitLoss: '0',
+          tradeCount: 0,
+          winCount: 0,
+          averageReturn: '0',
+        })
+        .returning();
+
+      return user;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw new Error('Failed to create user');
+    }
   }
 
   async getUser(id: number): Promise<User | undefined> {

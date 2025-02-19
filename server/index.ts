@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import crypto from "crypto";
+import { storage } from "./storage";
+import session from "express-session";
 
 // Generate a session secret if not provided
 if (!process.env.SESSION_SECRET) {
@@ -9,16 +11,31 @@ if (!process.env.SESSION_SECRET) {
 }
 
 const app = express();
+
+// Basic middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Error handling middleware
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Server error:', err);
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-  res.status(status).json({ message });
-});
+// Session configuration - must be before routes
+const sessionConfig = {
+  secret: process.env.SESSION_SECRET!,
+  resave: false,
+  saveUninitialized: false,
+  store: storage.sessionStore,
+  cookie: {
+    secure: app.get('env') === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax'
+  }
+};
+
+if (app.get("env") === "production") {
+  app.set("trust proxy", 1);
+  sessionConfig.cookie.secure = true;
+}
+
+app.use(session(sessionConfig));
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -51,13 +68,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Error handling middleware
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('Server error:', err);
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  res.status(status).json({ message });
+});
+
 (async () => {
   try {
     // First verify database connection
     const { pool } = await import("./db");
     const maxRetries = 3;
     let retries = 0;
-    
+
     while (retries < maxRetries) {
       try {
         await pool.query('SELECT 1');
@@ -86,7 +111,7 @@ app.use((req, res, next) => {
     const startServer = async (startPort = 5000) => {
       const maxPort = startPort + 10; // Try up to 10 ports
       let PORT = startPort;
-      
+
       while (PORT <= maxPort) {
         try {
           await new Promise((resolve, reject) => {
@@ -95,7 +120,7 @@ app.use((req, res, next) => {
                 log(`Server running on port ${PORT}`);
                 resolve(true);
               })
-              .once('error', (err) => {
+              .once('error', (err: Error & { code?: string }) => {
                 if (err.code === 'EADDRINUSE') {
                   server.close();
                   PORT++;
