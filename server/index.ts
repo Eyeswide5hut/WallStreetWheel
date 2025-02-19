@@ -55,12 +55,23 @@ app.use((req, res, next) => {
   try {
     // First verify database connection
     const { pool } = await import("./db");
-    try {
-      await pool.query('SELECT 1');
-      log('Database connection successful');
-    } catch (err) {
-      console.error('Database connection failed:', err);
-      process.exit(1);
+    const maxRetries = 3;
+    let retries = 0;
+    
+    while (retries < maxRetries) {
+      try {
+        await pool.query('SELECT 1');
+        log('Database connection successful');
+        break;
+      } catch (err) {
+        retries++;
+        console.error(`Database connection attempt ${retries} failed:`, err);
+        if (retries === maxRetries) {
+          console.error('Max retries reached, exiting...');
+          process.exit(1);
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
     }
 
     const server = registerRoutes(app);
