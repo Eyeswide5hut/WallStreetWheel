@@ -16,7 +16,6 @@ export const pool = new Pool({
   max: 5,
   maxUses: 5000,
   idleTimeoutMillis: 30000,
-  retryInterval: 1000,
   connectionTimeoutMillis: 10000,
 });
 
