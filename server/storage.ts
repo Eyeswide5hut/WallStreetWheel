@@ -6,41 +6,9 @@ import { eq, sql } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
-import { type UpdateUser, type LeaderboardMetric } from "@shared/schema";
+import { type UpdateUser } from "@shared/schema";
 
 const PostgresSessionStore = connectPg(session);
-
-export interface IStorage {
-  // Existing methods
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  createTrade(userId: number, trade: InsertTrade): Promise<Trade>;
-  getUserTrades(userId: number): Promise<Trade[]>;
-  getTrade(id: number): Promise<Trade | undefined>;
-  getLeaderboard(metric: LeaderboardMetric, order: "asc" | "desc", limit: number): Promise<Partial<User>[]>;
-  sessionStore: session.Store;
-  updateUser(id: number, data: UpdateUser): Promise<User>;
-  getTraderProfile(id: number): Promise<User | undefined>;
-  closeTrade(tradeId: number, closeData: {
-    closePrice: number;
-    closeDate: Date;
-    wasAssigned: boolean;
-  }): Promise<Trade>;
-  getSharePositions(userId: number): Promise<SharePosition[]>;
-  updateSharePosition(userId: number, symbol: string, quantity: number, cost: number): Promise<SharePosition>;
-  createSharePosition(userId: number, position: InsertSharePosition): Promise<SharePosition>;
-
-  // New methods for account transactions
-  createTransaction(userId: number, transaction: InsertTransaction): Promise<AccountTransaction>;
-  getUserTransactions(userId: number): Promise<AccountTransaction[]>;
-  getUserBalance(userId: number): Promise<{
-    currentBalance: string;
-    totalDeposited: string;
-    totalWithdrawn: string;
-    totalCapitalUsed: string;
-  }>;
-}
 
 export class DatabaseStorage implements IStorage {
   readonly sessionStore: session.Store;
@@ -55,6 +23,80 @@ export class DatabaseStorage implements IStorage {
     };
 
     this.sessionStore = new PostgresSessionStore(pgStoreOptions);
+  }
+
+  async getUser(id: number): Promise<User | undefined> {
+    try {
+      if (!id || typeof id !== 'number') {
+        console.error('Invalid user ID:', id);
+        return undefined;
+      }
+
+      const [user] = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          password: users.password,
+          email: users.email,
+          platforms: users.platforms,
+          preferences: users.preferences,
+          totalProfitLoss: users.totalProfitLoss,
+          tradeCount: users.tradeCount,
+          winCount: users.winCount,
+          averageReturn: users.averageReturn,
+          currentBalance: users.currentBalance,
+          totalDeposited: users.totalDeposited,
+          totalWithdrawn: users.totalWithdrawn,
+          totalCapitalUsed: users.totalCapitalUsed,
+          rank: users.rank,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt
+        })
+        .from(users)
+        .where(eq(users.id, id));
+
+      return user;
+    } catch (error) {
+      console.error('Error retrieving user:', error);
+      return undefined;
+    }
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    try {
+      if (!username) {
+        console.error('Invalid username:', username);
+        return undefined;
+      }
+
+      const [user] = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          password: users.password,
+          email: users.email,
+          platforms: users.platforms,
+          preferences: users.preferences,
+          totalProfitLoss: users.totalProfitLoss,
+          tradeCount: users.tradeCount,
+          winCount: users.winCount,
+          averageReturn: users.averageReturn,
+          currentBalance: users.currentBalance,
+          totalDeposited: users.totalDeposited,
+          totalWithdrawn: users.totalWithdrawn,
+          totalCapitalUsed: users.totalCapitalUsed,
+          rank: users.rank,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt
+        })
+        .from(users)
+        .where(eq(users.username, username));
+
+      return user;
+    } catch (error) {
+      console.error('Error retrieving user by username:', error);
+      return undefined;
+    }
   }
 
   async createTransaction(userId: number, transaction: InsertTransaction): Promise<AccountTransaction> {
@@ -215,55 +257,6 @@ export class DatabaseStorage implements IStorage {
       console.error('Error creating trade:', error);
       throw new Error('Failed to create trade');
     }
-  }
-
-  async getUser(id: number): Promise<User | undefined> {
-    try {
-      if (!id || typeof id !== 'number') {
-        console.error('Invalid user ID:', id);
-        return undefined;
-      }
-
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, id))
-        .execute();
-
-      return user;
-    } catch (error) {
-      console.error('Error retrieving user:', error);
-      return undefined;
-    }
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    try {
-      if (!username) {
-        console.error('Invalid username:', username);
-        return undefined;
-      }
-
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, username))
-        .execute();
-
-      return user;
-    } catch (error) {
-      console.error('Error retrieving user by username:', error);
-      return undefined;
-    }
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
-  }
-
-  async getUserTrades(userId: number): Promise<Trade[]> {
-    return db.select().from(trades).where(eq(trades.userId, userId));
   }
 
   async getTrade(id: number): Promise<Trade | undefined> {
@@ -588,6 +581,9 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return newPosition;
+  }
+  async getUserTrades(userId: number): Promise<Trade[]> {
+    return db.select().from(trades).where(eq(trades.userId, userId));
   }
 }
 
