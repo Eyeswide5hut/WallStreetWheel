@@ -57,10 +57,16 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
     mutationFn: async (data: TradeCloseData) => {
       if (!trade?.id) throw new Error("No trade selected");
 
-      // Ensure proper number formatting for closePrice
+      // When exercised/assigned, use strike price as close price
+      const closePrice = data.wasAssigned ? Number(trade.strikePrice) : Number(data.closePrice);
+      
       const formattedData = {
         ...data,
-        closePrice: Number(data.closePrice),
+        closePrice,
+        closeDate: data.closeDate,
+        wasAssigned: data.wasAssigned,
+        sharesAssigned: data.wasAssigned ? (trade.quantity * 100) : undefined,
+        assignmentPrice: data.wasAssigned ? Number(trade.strikePrice) : undefined
       };
 
       const response = await apiRequest("PATCH", `/api/trades/${trade.id}`, formattedData);

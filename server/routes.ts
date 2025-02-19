@@ -79,6 +79,18 @@ export function registerRoutes(app: Express): Server {
       }
 
       const updatedTrade = await storage.closeTrade(tradeId, validatedData);
+      
+      // Update share position if trade was assigned/exercised
+      if (validatedData.wasAssigned && trade.optionType) {
+        const quantityChange = trade.optionType.includes('call') ? -trade.quantity * 100 : trade.quantity * 100;
+        await storage.updateSharePosition(
+          trade.userId,
+          trade.underlyingAsset,
+          quantityChange,
+          Number(trade.strikePrice)
+        );
+      }
+      
       res.json(updatedTrade);
     } catch (error) {
       console.error('Trade close error:', error);
