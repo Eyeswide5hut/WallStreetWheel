@@ -26,7 +26,7 @@ import { z } from "zod";
 import { Loader2 } from "lucide-react";
 
 const tradeCloseSchema = z.object({
-  closePrice: z.string().transform((val) => parseFloat(val)),
+  closePrice: z.string().transform((val) => Number(val) || 0),
   closeDate: z.string(),
   wasAssigned: z.boolean().default(false)
 });
@@ -48,7 +48,7 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
     resolver: zodResolver(tradeCloseSchema),
     defaultValues: {
       closePrice: trade?.closePrice?.toString() ?? "",
-      closeDate: trade?.closeDate ? new Date(trade.closeDate).toISOString().split('T')[0] : "",
+      closeDate: trade?.closeDate ? new Date(trade.closeDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       wasAssigned: trade?.wasAssigned ?? false
     }
   });
@@ -56,7 +56,14 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
   const closePositionMutation = useMutation({
     mutationFn: async (data: TradeCloseData) => {
       if (!trade?.id) throw new Error("No trade selected");
-      const response = await apiRequest("PATCH", `/api/trades/${trade.id}`, data);
+
+      // Ensure proper number formatting for closePrice
+      const formattedData = {
+        ...data,
+        closePrice: Number(data.closePrice),
+      };
+
+      const response = await apiRequest("PATCH", `/api/trades/${trade.id}`, formattedData);
       if (!response.ok) {
         const error = await response.text();
         throw new Error(error);
@@ -166,6 +173,7 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
                           <Input
                             type="number"
                             step="0.01"
+                            min="0"
                             placeholder={`Enter ${isOption ? 'option value' : 'share price'}`}
                             {...field}
                           />
