@@ -56,7 +56,9 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
 
   const handleCloseTrade = (trade: Trade, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelectedTrade(trade);
+    if (!trade.closeDate) {
+      setSelectedTrade(trade);
+    }
   };
 
   const getTradeValue = (trade: Trade) => {
