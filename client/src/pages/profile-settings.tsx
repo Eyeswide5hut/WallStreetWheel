@@ -354,25 +354,93 @@ export default function ProfileSettings() {
                               <div className="space-y-4 border rounded-lg p-4">
                                 <div className="flex items-center justify-between">
                                   <h4 className="font-medium">Account Balance</h4>
-                                  <DialogTrigger
-                                    asChild
-                                    open={balanceAdjustment !== null}
-                                    onOpenChange={(open) => {
-                                      if (open) {
-                                        setBalanceAdjustment({ type: 'deposit', amount: 0, platformIndex: index });
-                                      } else {
-                                        setBalanceAdjustment(null);
-                                      }
-                                    }}
-                                  >
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                    >
-                                      <CreditCard className="h-4 w-4 mr-2" />
-                                      Adjust Balance
-                                    </Button>
-                                  </DialogTrigger>
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setBalanceAdjustment({
+                                          type: 'deposit',
+                                          amount: 0,
+                                          platformIndex: index
+                                        })}
+                                      >
+                                        <CreditCard className="h-4 w-4 mr-2" />
+                                        Adjust Balance
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                      <DialogHeader>
+                                        <DialogTitle>Adjust Account Balance</DialogTitle>
+                                        <DialogDescription>
+                                          Enter the amount to deposit or withdraw from your account
+                                        </DialogDescription>
+                                      </DialogHeader>
+                                      <Form {...balanceAdjustmentForm}>
+                                        <form
+                                          onSubmit={balanceAdjustmentForm.handleSubmit((data) => {
+                                            if (balanceAdjustment) {
+                                              adjustBalanceMutation.mutate({
+                                                ...data,
+                                                platformIndex: balanceAdjustment.platformIndex,
+                                              });
+                                            }
+                                          })}
+                                          className="space-y-4"
+                                        >
+                                          <FormField
+                                            control={balanceAdjustmentForm.control}
+                                            name="type"
+                                            render={({ field }) => (
+                                              <FormItem>
+                                                <FormLabel>Transaction Type</FormLabel>
+                                                <Select
+                                                  onValueChange={field.onChange}
+                                                  defaultValue={field.value}
+                                                >
+                                                  <FormControl>
+                                                    <SelectTrigger>
+                                                      <SelectValue placeholder="Select type" />
+                                                    </SelectTrigger>
+                                                  </FormControl>
+                                                  <SelectContent>
+                                                    <SelectItem value="deposit">Deposit</SelectItem>
+                                                    <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              </FormItem>
+                                            )}
+                                          />
+                                          <FormField
+                                            control={balanceAdjustmentForm.control}
+                                            name="amount"
+                                            render={({ field }) => (
+                                              <FormItem>
+                                                <FormLabel>Amount</FormLabel>
+                                                <FormControl>
+                                                  <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    placeholder="Enter amount"
+                                                    {...field}
+                                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                                  />
+                                                </FormControl>
+                                              </FormItem>
+                                            )}
+                                          />
+                                          <Button
+                                            type="submit"
+                                            className="w-full"
+                                            disabled={adjustBalanceMutation.isPending}
+                                          >
+                                            Confirm
+                                          </Button>
+                                        </form>
+                                      </Form>
+                                    </DialogContent>
+                                  </Dialog>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -655,6 +723,7 @@ export default function ProfileSettings() {
         </div>
       </div>
 
+      {/* Position History Dialog */}
       <Dialog open={!!selectedPosition} onOpenChange={() => setSelectedPosition(null)}>
         <DialogContent>
           <DialogHeader>
@@ -683,84 +752,6 @@ export default function ProfileSettings() {
               </div>
             ))}
           </ScrollArea>
-        </DialogContent>
-      </Dialog>
-
-      {/* Balance Adjustment Dialog */}
-      <Dialog
-        open={balanceAdjustment !== null}
-        onOpenChange={(open) => !open && setBalanceAdjustment(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Adjust Account Balance</DialogTitle>
-            <DialogDescription>
-              Enter the amount to deposit or withdraw from your account
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...balanceAdjustmentForm}>
-            <form
-              onSubmit={balanceAdjustmentForm.handleSubmit((data) => {
-                if (balanceAdjustment) {
-                  adjustBalanceMutation.mutate({
-                    ...data,
-                    platformIndex: balanceAdjustment.platformIndex,
-                  });
-                }
-              })}
-              className="space-y-4"
-            >
-              <FormField
-                control={balanceAdjustmentForm.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Transaction Type</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="deposit">Deposit</SelectItem>
-                        <SelectItem value="withdrawal">Withdrawal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={balanceAdjustmentForm.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Enter amount"
-                        {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={adjustBalanceMutation.isPending}
-              >
-                Confirm
-              </Button>
-            </form>
-          </Form>
         </DialogContent>
       </Dialog>
     </div>
