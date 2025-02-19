@@ -142,19 +142,16 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid trader ID" });
       }
 
-      // First check if trader exists
-      const trader = await storage.getTraderProfile(traderId);
+      const trader = await storage.getUser(traderId);
+      const trades = await storage.getUserTrades(traderId);
       if (!trader) {
         return res.status(404).json({ error: "Trader not found" });
       }
 
-      // Also fetch their trades
-      const trades = await storage.getUserTrades(traderId);
-
       // Calculate derived metrics
       const winRate = trader.tradeCount ? (trader.winCount || 0) / trader.tradeCount : 0;
 
-      // Return trader with calculated metrics, excluding sensitive data
+      // Return trader with calculated metrics and trades
       res.json({
         id: trader.id,
         username: trader.username,
@@ -166,7 +163,7 @@ export function registerRoutes(app: Express): Server {
         preferences: trader.preferences,
         rank: trader.rank,
         winRate,
-        trades // Include trades in the response
+        trades
       });
     } catch (error) {
       console.error('Trader profile error:', error);
