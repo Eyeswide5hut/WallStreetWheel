@@ -23,11 +23,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 type TradeTableProps = {
   initialTrades?: Trade[];
   readOnly?: boolean;
+  showClosed?: boolean;
 };
 
 const PAGE_SIZE = 10;
 
-export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps) {
+export function TradeTable({ initialTrades, readOnly = false, showClosed = false }: TradeTableProps) {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [page, setPage] = useState(1);
 
@@ -38,14 +39,25 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
   });
 
   const trades = initialTrades || fetchedTrades;
+  const filteredTrades = showClosed 
+    ? trades?.filter(t => t.closeDate)
+    : trades?.filter(t => !t.closeDate);
 
   const formatCurrency = (value: string | number | null | undefined) => {
     if (value === null || value === undefined) return "-";
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(numValue);
+  };
+
+  const formatPercentage = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined) return "-";
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    return `${numValue.toFixed(2)}%`;
   };
 
   const handleRowClick = (trade: Trade) => {
@@ -77,13 +89,17 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
     return `${trade.quantity} @ ${formatCurrency(trade.entryPrice)}`;
   };
 
-  const getTradeStatus = (trade: Trade) => {
-    if (trade.tradeType === 'option') {
-      if (trade.wasAssigned) return "Assigned";
-      if (trade.closeDate) return "Closed";
-      return "Open";
-    }
-    return trade.closeDate ? "Closed" : "Open";
+  const getDaysOpen = (trade: Trade) => {
+    const start = new Date(trade.tradeDate);
+    const end = trade.closeDate ? new Date(trade.closeDate) : new Date();
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const getTotalCost = (trade: Trade) => {
+    const commission = trade.commission ? parseFloat(trade.commission.toString()) : 0;
+    const fees = trade.fees ? parseFloat(trade.fees.toString()) : 0;
+    return commission + fees;
   };
 
   const getStatusVariant = (trade: Trade) => {
@@ -92,34 +108,37 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
     return "outline";
   };
 
-  const totalPages = trades ? Math.ceil(trades.length / PAGE_SIZE) : 0;
+  const totalPages = filteredTrades ? Math.ceil(filteredTrades.length / PAGE_SIZE) : 0;
   const startIndex = (page - 1) * PAGE_SIZE;
-  const paginatedTrades = trades?.slice(startIndex, startIndex + PAGE_SIZE);
+  const paginatedTrades = filteredTrades?.slice(startIndex, startIndex + PAGE_SIZE);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Trading History</CardTitle>
+        <CardTitle>{showClosed ? "Closed Positions" : "Open Positions"}</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Asset</TableHead>
-              <TableHead>Details</TableHead>
-              <TableHead>Value</TableHead>
+              <TableHead>Symbol</TableHead>
+              <TableHead>Strategy</TableHead>
+              <TableHead className="text-right">Strike</TableHead>
+              <TableHead className="text-right">Quantity</TableHead>
+              <TableHead className="text-right">Cost Basis</TableHead>
+              <TableHead className="text-right">P/L ($)</TableHead>
+              <TableHead className="text-right">P/L (%)</TableHead>
+              <TableHead className="text-right">Days</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>P/L</TableHead>
               {!readOnly && <TableHead className="text-right">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={readOnly ? 7 : 8} className="text-center py-4">
-                  Loading trades...
+                <TableCell colSpan={readOnly ? 10 : 11} className="text-center py-4">
+                  Loading positions...
                 </TableCell>
               </TableRow>
             ) : paginatedTrades?.map((trade) => (
@@ -128,26 +147,19 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
                 className="cursor-pointer hover:bg-muted/50"
                 onClick={() => handleRowClick(trade)}
               >
-                <TableCell>
-                  {new Date(trade.tradeDate).toLocaleDateString()}
-                </TableCell>
-                <TableCell className="capitalize">
-                  {trade.tradeType === 'option'
-                    ? trade.optionType?.replace(/_/g, ' ')
-                    : trade.tradeType.replace(/_/g, ' ')}
-                </TableCell>
+                <TableCell>{new Date(trade.tradeDate).toLocaleDateString()}</TableCell>
                 <TableCell>{trade.underlyingAsset}</TableCell>
-                <TableCell>{getTradeDetails(trade)}</TableCell>
-                <TableCell>{getTradeValue(trade)}</TableCell>
                 <TableCell>
-                  <Badge
-                    variant={getStatusVariant(trade)}
-                    className={trade.wasAssigned ? "bg-yellow-100 text-yellow-800" : ""}
-                  >
-                    {getTradeStatus(trade)}
-                  </Badge>
+                  {trade.strategy || (trade.tradeType === 'option'
+                    ? trade.optionType?.replace(/_/g, ' ')
+                    : trade.tradeType.replace(/_/g, ' '))}
                 </TableCell>
-                <TableCell className={`font-medium ${
+                <TableCell className="text-right">
+                  {trade.strikePrice ? formatCurrency(trade.strikePrice) : '-'}
+                </TableCell>
+                <TableCell className="text-right">{trade.quantity}</TableCell>
+                <TableCell className="text-right">{getTradeValue(trade)}</TableCell>
+                <TableCell className={`text-right font-medium ${
                   trade.profitLoss
                     ? parseFloat(trade.profitLoss.toString()) > 0
                       ? "text-green-600"
@@ -156,6 +168,24 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
                 }`}>
                   {trade.profitLoss && formatCurrency(trade.profitLoss)}
                 </TableCell>
+                <TableCell className={`text-right font-medium ${
+                  trade.profitLossPercent
+                    ? parseFloat(trade.profitLossPercent.toString()) > 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                    : ""
+                }`}>
+                  {trade.profitLossPercent && formatPercentage(trade.profitLossPercent)}
+                </TableCell>
+                <TableCell className="text-right">{getDaysOpen(trade)}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant={getStatusVariant(trade)}
+                    className={trade.wasAssigned ? "bg-yellow-100 text-yellow-800" : ""}
+                  >
+                    {trade.status}
+                  </Badge>
+                </TableCell>
                 {!readOnly && !trade.closeDate && (
                   <TableCell className="text-right">
                     <Button
@@ -163,16 +193,16 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
                       size="sm"
                       onClick={(e) => handleCloseTrade(trade, e)}
                     >
-                      Close Trade
+                      Close
                     </Button>
                   </TableCell>
                 )}
               </TableRow>
             ))}
-            {(!trades || trades.length === 0) && (
+            {(!filteredTrades || filteredTrades.length === 0) && (
               <TableRow>
-                <TableCell colSpan={readOnly ? 7 : 8} className="text-center text-muted-foreground">
-                  No trades found
+                <TableCell colSpan={readOnly ? 10 : 11} className="text-center text-muted-foreground">
+                  No positions found
                 </TableCell>
               </TableRow>
             )}

@@ -72,6 +72,7 @@ export const trades = pgTable("trades", {
   tradeType: text("trade_type").notNull(),
   underlyingAsset: text("underlying_asset").notNull(),
   optionType: text("option_type"),
+  strategy: text("strategy"),  // For tracking specific strategies like "vertical call"
   strikePrice: decimal("strike_price"),
   premium: decimal("premium"),
   quantity: integer("quantity").notNull(),
@@ -83,20 +84,22 @@ export const trades = pgTable("trades", {
   tags: text("tags").array(),
   tradeDate: timestamp("trade_date").notNull(),
   expirationDate: timestamp("expiration_date"),
-  legs: jsonb("legs").default('[]'),
+  status: text("status").notNull().default('open'), // 'open' or 'closed'
+  daysOpen: integer("days_open"),  // Calculated field
   profitLoss: decimal("profit_loss"),
+  profitLossPercent: decimal("profit_loss_percent"), // P/L as percentage
   isWin: boolean("is_win"),
   returnPercentage: decimal("return_percentage"),
   closeDate: timestamp("close_date"),
   closePrice: decimal("close_price"),
+  commission: decimal("commission").default('0'),  // Trading commission
+  fees: decimal("fees").default('0'),
   wasAssigned: boolean("was_assigned").default(false),
   sharesAssigned: integer("shares_assigned"),
   assignmentPrice: decimal("assignment_price"),
   affectedSharePositionId: integer("affected_share_position_id"),
   capitalUsed: decimal("capital_used").notNull().default('0'),
   marginUsed: decimal("margin_used").default('0'),
-  fees: decimal("fees").default('0'),
-  dividend: decimal("dividend").default('0'),
   metadata: jsonb("metadata").default('{}'),
 });
 
@@ -216,11 +219,15 @@ export const insertTradeSchema = createInsertSchema(trades)
     userId: true,
     profitLoss: true,
     isWin: true,
-    returnPercentage: true
+    returnPercentage: true,
+    daysOpen: true,
+    profitLossPercent: true,
+    closeDate: true
   })
   .extend({
     tradeType: z.enum(tradeTypes),
     optionType: z.enum(optionTypes).optional(),
+    strategy: z.string().optional(),
     strikePrice: z.number().optional(),
     premium: z.number().optional(),
     quantity: z.number().int().positive(),
@@ -236,10 +243,11 @@ export const insertTradeSchema = createInsertSchema(trades)
       if (isNaN(date.getTime())) throw new Error("Invalid expiration date");
       return date;
     }).optional(),
+    status: z.enum(["open", "closed"]).default("open"),
     sharesAssigned: z.number().int().optional(),
     assignmentPrice: z.number().optional(),
+    commission: z.number().min(0).optional(),
     fees: z.number().min(0).optional(),
-    dividend: z.number().min(0).optional(),
     metadata: z.record(z.unknown()).optional(),
   }).superRefine((data, ctx) => {
     if (data.tradeType === 'option') {
