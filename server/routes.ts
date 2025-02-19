@@ -52,8 +52,16 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/trades", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
-    const trades = await storage.getUserTrades(req.user!.id);
-    res.json(trades);
+    try {
+      const trades = await storage.getUserTrades(req.user!.id);
+      if (!trades) {
+        return res.status(404).json({ error: "No trades found" });
+      }
+      res.json(trades);
+    } catch (error) {
+      console.error('Error fetching trades:', error);
+      res.status(500).json({ error: "Database connection error - please try again" });
+    }
   });
 
   app.patch("/api/trades/:id/close", async (req, res) => {
