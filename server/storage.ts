@@ -7,6 +7,11 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 import { type UpdateUser } from "@shared/schema";
+import { type InsertTradeIdea, tradeIdeas, type TradeIdea, tradeIdeaComments, tradeIdeaReactions } from "@shared/schema";
+import { type InsertScannerConfig, scannerConfigs, type ScannerConfig } from "@shared/schema";
+import { type LeaderboardMetric } from "@shared/types";
+import { userFollows } from "@shared/schema";
+
 
 const PostgresSessionStore = connectPg(session);
 
@@ -28,6 +33,21 @@ export interface IStorage {
     totalWithdrawn: string;
     totalCapitalUsed: string;
   }>;
+
+  // Social Features
+  followUser(followerId: number, followedId: number): Promise<void>;
+  unfollowUser(followerId: number, followedId: number): Promise<void>;
+  getFollowers(userId: number): Promise<User[]>;
+  getFollowing(userId: number): Promise<User[]>;
+  createTradeIdea(userId: number, idea: InsertTradeIdea): Promise<TradeIdea>;
+  getTradeIdeas(filters?: { userId?: number; visibility?: string }): Promise<TradeIdea[]>;
+  addTradeIdeaComment(userId: number, ideaId: number, content: string): Promise<typeof tradeIdeaComments.$inferSelect>;
+  addTradeIdeaReaction(userId: number, ideaId: number, reaction: string): Promise<typeof tradeIdeaReactions.$inferSelect>;
+
+  // Market Scanner
+  createScannerConfig(userId: number, config: InsertScannerConfig): Promise<ScannerConfig>;
+  getScannerConfigs(userId: number): Promise<ScannerConfig[]>;
+  getPublicScannerTemplates(): Promise<ScannerConfig[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -166,8 +186,8 @@ export class DatabaseStorage implements IStorage {
           totalDeposited: users.totalDeposited,
           totalWithdrawn: users.totalWithdrawn,
         })
-        .from(users)
-        .where(eq(users.id, userId));
+          .from(users)
+          .where(eq(users.id, userId));
 
         if (!user) {
           throw new Error('User not found');
@@ -179,7 +199,7 @@ export class DatabaseStorage implements IStorage {
         const totalWithdrawn = parseFloat(user.totalWithdrawn?.toString() || '0');
 
         const amount = transaction.amount;
-        const newBalance = transaction.type === 'deposit' 
+        const newBalance = transaction.type === 'deposit'
           ? currentBalance + amount
           : currentBalance - amount;
 
@@ -187,7 +207,7 @@ export class DatabaseStorage implements IStorage {
         await tx.update(users)
           .set({
             currentBalance: newBalance.toString(),
-            totalDeposited: transaction.type === 'deposit' 
+            totalDeposited: transaction.type === 'deposit'
               ? (totalDeposited + amount).toString()
               : totalDeposited.toString(),
             totalWithdrawn: transaction.type === 'withdrawal'
@@ -277,8 +297,8 @@ export class DatabaseStorage implements IStorage {
         const [user] = await tx.select({
           totalCapitalUsed: users.totalCapitalUsed,
         })
-        .from(users)
-        .where(eq(users.id, userId));
+          .from(users)
+          .where(eq(users.id, userId));
 
         if (!user) {
           throw new Error('User not found');
@@ -627,6 +647,144 @@ export class DatabaseStorage implements IStorage {
   }
   async getUserTrades(userId: number): Promise<Trade[]> {
     return db.select().from(trades).where(eq(trades.userId, userId));
+  }
+
+  // Social Features Implementation
+  async followUser(followerId: number, followedId: number): Promise<void> {
+    if (followerId === followedId) {
+      throw new Error("Users cannot follow themselves");
+    }
+
+    await db.insert(userFollows)
+      .values({
+        followerId,
+        followedId
+      })
+      .onConflictDoNothing();
+  }
+
+  async unfollowUser(followerId: number, followedId: number): Promise<void> {
+    await db.delete(userFollows)
+      .where(sql`follower_id = ${followerId} AND followed_id = ${followedId}`);
+  }
+
+  async getFollowers(userId: number): Promise<User[]> {
+    const followers = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        platforms: users.platforms,
+        preferences: users.preferences,
+        totalProfitLoss: users.totalProfitLoss,
+        tradeCount: users.tradeCount,
+        winCount: users.winCount,
+        averageReturn: users.averageReturn,
+        rank: users.rank,
+        createdAt: users.createdAt,
+      })
+      .from(userFollows)
+      .innerJoin(users, eq(userFollows.followerId, users.id))
+      .where(eq(userFollows.followedId, userId));
+
+    return followers;
+  }
+
+  async getFollowing(userId: number): Promise<User[]> {
+    const following = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        platforms: users.platforms,
+        preferences: users.preferences,
+        totalProfitLoss: users.totalProfitLoss,
+        tradeCount: users.tradeCount,
+        winCount: users.winCount,
+        averageReturn: users.averageReturn,
+        rank: users.rank,
+        createdAt: users.createdAt,
+      })
+      .from(userFollows)
+      .innerJoin(users, eq(userFollows.followedId, users.id))
+      .where(eq(userFollows.followerId, userId));
+
+    return following;
+  }
+
+  async createTradeIdea(userId: number, idea: InsertTradeIdea): Promise<TradeIdea> {
+    const [newIdea] = await db.insert(tradeIdeas)
+      .values({
+        userId,
+        ...idea,
+      })
+      .returning();
+
+    return newIdea;
+  }
+
+  async getTradeIdeas(filters?: { userId?: number; visibility?: string }): Promise<TradeIdea[]> {
+    let query = db.select().from(tradeIdeas);
+
+    if (filters?.userId) {
+      query = query.where(eq(tradeIdeas.userId, filters.userId));
+    }
+
+    if (filters?.visibility) {
+      query = query.where(eq(tradeIdeas.visibility, filters.visibility));
+    }
+
+    return query.orderBy(sql`${tradeIdeas.createdAt} DESC`);
+  }
+
+  async addTradeIdeaComment(userId: number, ideaId: number, content: string) {
+    const [comment] = await db.insert(tradeIdeaComments)
+      .values({
+        userId,
+        tradeIdeaId: ideaId,
+        content
+      })
+      .returning();
+
+    return comment;
+  }
+
+  async addTradeIdeaReaction(userId: number, ideaId: number, reaction: string) {
+    const [newReaction] = await db.insert(tradeIdeaReactions)
+      .values({
+        userId,
+        tradeIdeaId: ideaId,
+        reaction
+      })
+      .returning();
+
+    return newReaction;
+  }
+
+  // Market Scanner Implementation
+  async createScannerConfig(userId: number, config: InsertScannerConfig): Promise<ScannerConfig> {
+    const [newConfig] = await db.insert(scannerConfigs)
+      .values({
+        userId,
+        ...config,
+      })
+      .returning();
+
+    return newConfig;
+  }
+
+  async getScannerConfigs(userId: number): Promise<ScannerConfig[]> {
+    return db.select()
+      .from(scannerConfigs)
+      .where(eq(scannerConfigs.userId, userId))
+      .orderBy(sql`${scannerConfigs.updatedAt} DESC`);
+  }
+
+  async getPublicScannerTemplates(): Promise<ScannerConfig[]> {
+    return db.select()
+      .from(scannerConfigs)
+      .where(sql`is_template = true AND is_public = true`)
+      .orderBy(sql`${scannerConfigs.updatedAt} DESC`);
   }
 }
 

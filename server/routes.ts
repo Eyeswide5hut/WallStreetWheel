@@ -79,7 +79,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const updatedTrade = await storage.closeTrade(tradeId, validatedData);
-      
+
       // Update share position if trade was assigned/exercised
       if (validatedData.wasAssigned && trade.optionType) {
         const quantityChange = trade.optionType.includes('call') ? -trade.quantity * 100 : trade.quantity * 100;
@@ -90,7 +90,7 @@ export function registerRoutes(app: Express): Server {
           Number(trade.strikePrice)
         );
       }
-      
+
       res.json(updatedTrade);
     } catch (error) {
       console.error('Trade close error:', error);
@@ -207,6 +207,176 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching share positions:', error);
       res.status(500).json({ error: "Failed to fetch share positions" });
+    }
+  });
+
+  // Add these new routes after the existing ones
+  // Social Features Routes
+  app.post("/api/users/:id/follow", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const followedId = parseInt(req.params.id);
+      if (isNaN(followedId)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+
+      await storage.followUser(req.user!.id, followedId);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Follow user error:', error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to follow user" });
+    }
+  });
+
+  app.delete("/api/users/:id/follow", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const followedId = parseInt(req.params.id);
+      if (isNaN(followedId)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+
+      await storage.unfollowUser(req.user!.id, followedId);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Unfollow user error:', error);
+      res.status(400).json({ error: "Failed to unfollow user" });
+    }
+  });
+
+  app.get("/api/users/:id/followers", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const userId = parseInt(req.params.id);
+      if (isNaN(userId)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+
+      const followers = await storage.getFollowers(userId);
+      res.json(followers);
+    } catch (error) {
+      console.error('Get followers error:', error);
+      res.status(500).json({ error: "Failed to get followers" });
+    }
+  });
+
+  app.get("/api/users/:id/following", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const userId = parseInt(req.params.id);
+      if (isNaN(userId)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+
+      const following = await storage.getFollowing(userId);
+      res.json(following);
+    } catch (error) {
+      console.error('Get following error:', error);
+      res.status(500).json({ error: "Failed to get following" });
+    }
+  });
+
+  // Trade Ideas Routes
+  app.post("/api/trade-ideas", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const validatedIdea = insertTradeIdeaSchema.parse(req.body);
+      const idea = await storage.createTradeIdea(req.user!.id, validatedIdea);
+      res.status(201).json(idea);
+    } catch (error) {
+      console.error('Create trade idea error:', error);
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: fromZodError(error).message });
+      } else {
+        res.status(400).json({ error: "Invalid trade idea data" });
+      }
+    }
+  });
+
+  app.get("/api/trade-ideas", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const { userId, visibility } = req.query;
+      const filters = {
+        userId: userId ? parseInt(userId as string) : undefined,
+        visibility: visibility as string | undefined
+      };
+
+      const ideas = await storage.getTradeIdeas(filters);
+      res.json(ideas);
+    } catch (error) {
+      console.error('Get trade ideas error:', error);
+      res.status(500).json({ error: "Failed to get trade ideas" });
+    }
+  });
+
+  app.post("/api/trade-ideas/:id/comments", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const ideaId = parseInt(req.params.id);
+      if (isNaN(ideaId)) {
+        return res.status(400).json({ error: "Invalid trade idea ID" });
+      }
+
+      const { content } = req.body;
+      if (!content || typeof content !== 'string') {
+        return res.status(400).json({ error: "Comment content is required" });
+      }
+
+      const comment = await storage.addTradeIdeaComment(req.user!.id, ideaId, content);
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error('Add comment error:', error);
+      res.status(400).json({ error: "Failed to add comment" });
+    }
+  });
+
+  // Market Scanner Routes
+  app.post("/api/scanner/configs", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const validatedConfig = insertScannerConfigSchema.parse(req.body);
+      const config = await storage.createScannerConfig(req.user!.id, validatedConfig);
+      res.status(201).json(config);
+    } catch (error) {
+      console.error('Create scanner config error:', error);
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: fromZodError(error).message });
+      } else {
+        res.status(400).json({ error: "Invalid scanner configuration" });
+      }
+    }
+  });
+
+  app.get("/api/scanner/configs", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const configs = await storage.getScannerConfigs(req.user!.id);
+      res.json(configs);
+    } catch (error) {
+      console.error('Get scanner configs error:', error);
+      res.status(500).json({ error: "Failed to get scanner configurations" });
+    }
+  });
+
+  app.get("/api/scanner/templates", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const templates = await storage.getPublicScannerTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error('Get scanner templates error:', error);
+      res.status(500).json({ error: "Failed to get scanner templates" });
     }
   });
 

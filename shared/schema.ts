@@ -139,6 +139,68 @@ export const sharePositions = pgTable("share_positions", {
   acquisitionHistory: jsonb("acquisition_history").default('[]'),
 });
 
+// Social Features - Tables and Types
+export const userFollows = pgTable("user_follows", {
+  id: serial("id").primaryKey(),
+  followerId: integer("follower_id").notNull().references(() => users.id),
+  followedId: integer("followed_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const tradeIdeas = pgTable("trade_ideas", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  symbol: text("symbol").notNull(),
+  strategy: text("strategy"),
+  optionType: text("option_type"),
+  strikePrice: decimal("strike_price"),
+  expirationDate: timestamp("expiration_date"),
+  targetPrice: decimal("target_price"),
+  stopLoss: decimal("stop_loss"),
+  riskReward: decimal("risk_reward"),
+  confidence: integer("confidence"),
+  timeframe: text("timeframe"),
+  tags: text("tags").array(),
+  visibility: text("visibility").default("public"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const tradeIdeaComments = pgTable("trade_idea_comments", {
+  id: serial("id").primaryKey(),
+  tradeIdeaId: integer("trade_idea_id").notNull().references(() => tradeIdeas.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const tradeIdeaReactions = pgTable("trade_idea_reactions", {
+  id: serial("id").primaryKey(),
+  tradeIdeaId: integer("trade_idea_id").notNull().references(() => tradeIdeas.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  reaction: text("reaction").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Market Scanner - Tables and Types
+export const scannerConfigs = pgTable("scanner_configs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  criteria: jsonb("criteria").notNull(),
+  isTemplate: boolean("is_template").default(false),
+  isPublic: boolean("is_public").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Add visibility types
+export const visibilityTypes = ["public", "private", "followers"] as const;
+
 // Zod schemas for validation
 const optionLegSchema = z.object({
   optionType: z.enum([...debitOptionTypes, ...creditOptionTypes] as const),
@@ -287,6 +349,47 @@ export const updateUserSchema = createInsertSchema(users)
     preferences: userPreferencesSchema.default({}),
   });
 
+// Zod schemas for new features
+export const insertTradeIdeaSchema = createInsertSchema(tradeIdeas)
+  .omit({
+    id: true,
+    userId: true,
+    createdAt: true,
+    updatedAt: true
+  })
+  .extend({
+    visibility: z.enum(visibilityTypes),
+    optionType: z.enum(optionTypes).optional(),
+    confidence: z.number().int().min(1).max(10).optional(),
+  });
+
+export const insertScannerConfigSchema = createInsertSchema(scannerConfigs)
+  .omit({
+    id: true,
+    userId: true,
+    createdAt: true,
+    updatedAt: true
+  })
+  .extend({
+    criteria: z.object({
+      optionType: z.enum(optionTypes).optional(),
+      minVolume: z.number().optional(),
+      maxPrice: z.number().optional(),
+      minDelta: z.number().optional(),
+      maxDelta: z.number().optional(),
+      minIV: z.number().optional(),
+      maxIV: z.number().optional(),
+      daysToExpiration: z.object({
+        min: z.number().optional(),
+        max: z.number().optional(),
+      }).optional(),
+      priceRange: z.object({
+        min: z.number().optional(),
+        max: z.number().optional(),
+      }).optional(),
+    }),
+  });
+
 // Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -309,3 +412,9 @@ export const leaderboardMetricSchema = z.object({
 });
 
 export type LeaderboardQuery = z.infer<typeof leaderboardMetricSchema>;
+
+// Type exports for new features
+export type InsertTradeIdea = z.infer<typeof insertTradeIdeaSchema>;
+export type TradeIdea = typeof tradeIdeas.$inferSelect;
+export type ScannerConfig = typeof scannerConfigs.$inferSelect;
+export type InsertScannerConfig = z.infer<typeof insertScannerConfigSchema>;
