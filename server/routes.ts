@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertTradeSchema, updateUserSchema, leaderboardMetricSchema, insertSharePositionSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
@@ -14,8 +13,6 @@ const closeTradeSchema = z.object({
 });
 
 export function registerRoutes(app: Express): Server {
-  setupAuth(app);
-
   // User profile routes
   app.patch("/api/user/profile", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);

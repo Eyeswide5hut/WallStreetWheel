@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import crypto from "crypto";
 import { storage } from "./storage";
 import session from "express-session";
+import passport from "passport";
 import { setupAuth } from "./auth";
 
 // Generate a session secret if not provided
@@ -17,7 +18,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration - must be before routes
+// Session configuration - must be before passport
 const sessionConfig: session.SessionOptions = {
   secret: process.env.SESSION_SECRET!,
   resave: false,
@@ -37,6 +38,10 @@ if (app.get("env") === "production") {
 }
 
 app.use(session(sessionConfig));
+
+// Initialize Passport and restore authentication state from session
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Setup authentication
 setupAuth(app);
