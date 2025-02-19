@@ -5,6 +5,7 @@ import { User, Trade } from "@shared/schema";
 import { useParams } from "wouter";
 import { Loader2 } from "lucide-react";
 import { TradeTable } from "@/components/trade/trade-table";
+import { MetricsCard } from "@/components/dashboard/metrics-card";
 
 type TraderProfile = Omit<User, "password" | "email"> & {
   trades: Trade[];
@@ -106,6 +107,14 @@ export default function TraderDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Add MetricsCard here */}
+          {trader.trades && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MetricsCard trades={trader.trades} />
+              {/* You can add another card here for the right side if needed */}
+            </div>
+          )}
 
           {/* Display trades table */}
           {trader.trades && (
