@@ -38,7 +38,17 @@ export const getQueryFn: <T>(options: {
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    // Only try to parse JSON for successful responses
+    if (res.ok) {
+      return res.json();
+    }
+    // For error responses, first try to parse JSON, if that fails return the text
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(text);
+    }
   };
 
 export const queryClient = new QueryClient({
