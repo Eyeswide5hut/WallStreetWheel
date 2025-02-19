@@ -90,14 +90,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTrade(userId: number, insertTrade: InsertTrade): Promise<Trade> {
-    const trade = {
-      ...insertTrade,
-      userId,
-      strikePrice: insertTrade.strikePrice?.toString(),
-      premium: insertTrade.premium.toString(),
-    };
-    const [createdTrade] = await db.insert(trades).values(trade).returning();
-    return createdTrade;
+    try {
+      const trade = {
+        ...insertTrade,
+        userId,
+        strikePrice: insertTrade.strikePrice?.toString(),
+        premium: insertTrade.premium.toString(),
+      };
+
+      const [createdTrade] = await db.insert(trades)
+        .values(trade)
+        .returning();
+
+      return createdTrade;
+    } catch (error) {
+      console.error('Error creating trade:', error);
+      throw new Error('Failed to create trade');
+    }
   }
 
   async getUserTrades(userId: number): Promise<Trade[]> {

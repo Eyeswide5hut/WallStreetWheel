@@ -50,6 +50,7 @@ interface TradeDialogProps {
   isOpen: boolean;
   onClose: () => void;
   mode: "edit" | "view";
+  readOnly?: boolean;
 }
 
 const getAssignmentText = (optionType: string) => {
@@ -69,7 +70,7 @@ const getAssignmentText = (optionType: string) => {
   }
 };
 
-export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) {
+export function TradeDialog({ trade, isOpen, onClose, mode, readOnly }: TradeDialogProps) {
   const { toast } = useToast();
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error' | 'confirming-delete'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -88,11 +89,10 @@ export function TradeDialog({ trade, isOpen, onClose, mode }: TradeDialogProps) 
       notes: trade.notes ?? undefined,
       closeDate: trade.closeDate ? new Date(trade.closeDate).toISOString().split('T')[0] : undefined,
       closePrice: trade.closePrice?.toString() ?? undefined,
-      wasAssigned: trade.wasAssigned,
+      wasAssigned: trade.wasAssigned ?? false,
     } : undefined,
   });
 
-  // Rest of the mutation handlers remain unchanged
   const editTradeMutation = useMutation({
     mutationFn: async (data: EditTradeData) => {
       setStatus('submitting');
