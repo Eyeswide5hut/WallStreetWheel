@@ -40,6 +40,13 @@ export function OverviewCards() {
     return sum + Number(t.profitLoss || 0);
   }, 0) || 0;
 
+  const tradingStats = {
+    totalPnL,
+    totalTrades,
+    winRate,
+    profitableTrades
+  };
+
   return (
     <div className="grid gap-4 md:grid-cols-4">
       <Card>
