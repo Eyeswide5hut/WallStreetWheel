@@ -103,7 +103,7 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
   };
 
   const getStatusVariant = (trade: Trade) => {
-    if (trade.wasAssigned) return "yellow";
+    if (trade.wasAssigned) return "warning";
     if (trade.closeDate) return "secondary";
     return "outline";
   };
