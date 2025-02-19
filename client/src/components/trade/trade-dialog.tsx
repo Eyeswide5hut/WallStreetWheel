@@ -8,7 +8,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -87,14 +86,18 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
   if (!trade) return null;
 
   const tradeDate = new Date(trade.tradeDate).toISOString().split('T')[0];
-  const expirationDate = new Date(trade.expirationDate).toISOString().split('T')[0];
+  const expirationDate = trade.expirationDate ? new Date(trade.expirationDate).toISOString().split('T')[0] : null;
+
+  const isOption = trade.tradeType === 'option';
+  const showExerciseOption = isOption && ['long_call', 'long_put', 'covered_call', 'cash_secured_put'].includes(trade.optionType || '');
+  const wasAssigned = form.watch('wasAssigned');
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            Close Position - {trade.underlyingAsset} {trade.optionType}
+            Close Position - {trade.underlyingAsset} {isOption ? trade.optionType : 'Stock'}
           </DialogTitle>
         </DialogHeader>
 
@@ -106,8 +109,8 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
                 <p>${trade.strikePrice}</p>
               </div>
               <div>
-                <h4 className="font-medium">Premium</h4>
-                <p>${trade.premium}</p>
+                <h4 className="font-medium">{isOption ? 'Premium' : 'Entry Price'}</h4>
+                <p>${trade.premium || trade.entryPrice}</p>
               </div>
               <div>
                 <h4 className="font-medium">Quantity</h4>
@@ -130,24 +133,48 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
             <Form {...form}>
               <form onSubmit={form.handleSubmit((data) => closePositionMutation.mutate(data))} 
                     className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="closePrice"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Close Price</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="Enter closing price"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {showExerciseOption && (
+                  <FormField
+                    control={form.control}
+                    name="wasAssigned"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Position was {isOption ? 'assigned/exercised' : 'called away'}
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {!wasAssigned && (
+                  <FormField
+                    control={form.control}
+                    name="closePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{isOption ? 'Option Value' : 'Share Price'}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={`Enter ${isOption ? 'option value' : 'share price'}`}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <FormField
                   control={form.control}
@@ -159,31 +186,11 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
                         <Input
                           type="date"
                           min={tradeDate}
-                          max={expirationDate}
+                          max={expirationDate || undefined}
                           {...field}
                         />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="wasAssigned"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>
-                          Position was assigned/exercised
-                        </FormLabel>
-                      </div>
                     </FormItem>
                   )}
                 />
