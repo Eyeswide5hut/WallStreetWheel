@@ -2,19 +2,16 @@ import { pgTable, text, serial, integer, decimal, timestamp, boolean, jsonb } fr
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const tradingPlatforms = [
-  "robinhood",
-  "td_ameritrade",
-  "e_trade",
-  "fidelity",
-  "charles_schwab",
-  "interactive_brokers",
-  "webull",
-  "tastyworks",
-  "think_or_swim",
+// Add support for various investment types
+export const investmentTypes = [
+  "stock",
+  "etf",
+  "mutual_fund",
+  "bond",
+  "cryptocurrency",
 ] as const;
 
-// Categorize option types by whether they are credit or debit trades
+// Define option types
 export const debitOptionTypes = [
   "long_call",
   "long_put",
@@ -40,10 +37,69 @@ export const optionTypes = [
   ...spreadOptionTypes,
 ] as const;
 
-// Add transaction types
-export const transactionTypes = ["deposit", "withdrawal"] as const;
+// Combine all trade types
+export const tradeTypes = [
+  ...investmentTypes,
+  "option",
+] as const;
 
-// Add accountTransactions table
+// Transaction types for tracking cash flows
+export const transactionTypes = [
+  "deposit",
+  "withdrawal",
+  "dividend",
+  "interest",
+  "fee",
+] as const;
+
+// Platform definitions
+export const tradingPlatforms = [
+  "robinhood",
+  "td_ameritrade",
+  "e_trade",
+  "fidelity",
+  "charles_schwab",
+  "interactive_brokers",
+  "webull",
+  "tastyworks",
+  "think_or_swim",
+] as const;
+
+// Schema definitions
+export const trades = pgTable("trades", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  tradeType: text("trade_type").notNull(),
+  underlyingAsset: text("underlying_asset").notNull(),
+  optionType: text("option_type"),
+  strikePrice: decimal("strike_price"),
+  premium: decimal("premium"),
+  quantity: integer("quantity").notNull(),
+  entryPrice: decimal("entry_price"),
+  exitPrice: decimal("exit_price"),
+  platform: text("platform"),
+  useMargin: boolean("use_margin").default(false),
+  notes: text("notes"),
+  tags: text("tags").array(),
+  tradeDate: timestamp("trade_date").notNull(),
+  expirationDate: timestamp("expiration_date"),
+  legs: jsonb("legs").default('[]'),
+  profitLoss: decimal("profit_loss"),
+  isWin: boolean("is_win"),
+  returnPercentage: decimal("return_percentage"),
+  closeDate: timestamp("close_date"),
+  closePrice: decimal("close_price"),
+  wasAssigned: boolean("was_assigned").default(false),
+  sharesAssigned: integer("shares_assigned"),
+  assignmentPrice: decimal("assignment_price"),
+  affectedSharePositionId: integer("affected_share_position_id"),
+  capitalUsed: decimal("capital_used").notNull().default('0'),
+  marginUsed: decimal("margin_used").default('0'),
+  fees: decimal("fees").default('0'),
+  dividend: decimal("dividend").default('0'),
+  metadata: jsonb("metadata").default('{}'),
+});
+
 export const accountTransactions = pgTable("account_transactions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -53,7 +109,6 @@ export const accountTransactions = pgTable("account_transactions", {
   notes: text("notes"),
 });
 
-// Modify users table to include balance tracking
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -74,20 +129,6 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-const basePremiumSchema = z.number().or(z.string()).transform(val =>
-  typeof val === 'string' ? parseFloat(val) : val
-);
-
-const optionLegSchema = z.object({
-  optionType: z.enum([...debitOptionTypes, ...creditOptionTypes] as const),
-  strikePrice: basePremiumSchema,
-  premium: basePremiumSchema.refine(val => val > 0, {
-    message: "Premium must be a positive number"
-  }),
-  side: z.enum(["buy", "sell"]),
-  quantity: z.number().int().positive()
-});
-
 export const sharePositions = pgTable("share_positions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -95,46 +136,91 @@ export const sharePositions = pgTable("share_positions", {
   quantity: integer("quantity").notNull(),
   averageCost: decimal("average_cost").notNull(),
   lastUpdated: timestamp("last_updated").defaultNow(),
-  acquisitionHistory: jsonb("acquisition_history").default('[]'), // Array of acquisition events including options assignments
+  acquisitionHistory: jsonb("acquisition_history").default('[]'),
 });
 
-// Add share position schema
+// Zod schemas for validation
+const optionLegSchema = z.object({
+  optionType: z.enum([...debitOptionTypes, ...creditOptionTypes] as const),
+  strikePrice: z.number(),
+  premium: z.number().positive(),
+  side: z.enum(["buy", "sell"]),
+  quantity: z.number().int().positive()
+});
+
+export const insertTradeSchema = createInsertSchema(trades)
+  .omit({
+    id: true,
+    userId: true,
+    profitLoss: true,
+    isWin: true,
+    returnPercentage: true
+  })
+  .extend({
+    tradeType: z.enum(tradeTypes),
+    optionType: z.enum(optionTypes).optional(),
+    strikePrice: z.number().optional(),
+    premium: z.number().optional(),
+    quantity: z.number().int().positive(),
+    entryPrice: z.number().optional(),
+    exitPrice: z.number().optional(),
+    tradeDate: z.string().transform((val) => {
+      const date = new Date(val);
+      if (isNaN(date.getTime())) throw new Error("Invalid trade date");
+      return date;
+    }),
+    expirationDate: z.string().transform((val) => {
+      const date = new Date(val);
+      if (isNaN(date.getTime())) throw new Error("Invalid expiration date");
+      return date;
+    }).optional(),
+    sharesAssigned: z.number().int().optional(),
+    assignmentPrice: z.number().optional(),
+    fees: z.number().min(0).optional(),
+    dividend: z.number().min(0).optional(),
+    metadata: z.record(z.unknown()).optional(),
+  }).superRefine((data, ctx) => {
+    if (data.tradeType === 'option') {
+      if (!data.optionType) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Option type is required for option trades",
+        });
+      }
+      if (!data.strikePrice) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Strike price is required for option trades",
+        });
+      }
+      if (!data.premium) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Premium is required for option trades",
+        });
+      }
+      if (!data.expirationDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Expiration date is required for option trades",
+        });
+      }
+    } else {
+      if (!data.entryPrice) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Entry price is required for non-option trades",
+        });
+      }
+    }
+  });
+
 export const insertSharePositionSchema = createInsertSchema(sharePositions)
   .omit({ id: true, lastUpdated: true })
   .extend({
     quantity: z.number().int(),
     averageCost: z.number().positive(),
   });
-
-// Update trades table to include capital usage tracking
-export const trades = pgTable("trades", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  underlyingAsset: text("underlying_asset").notNull(),
-  optionType: text("option_type").notNull(),
-  strikePrice: decimal("strike_price"),
-  premium: decimal("premium").notNull(),
-  quantity: integer("quantity").notNull(),
-  platform: text("platform"),
-  useMargin: boolean("use_margin").default(false),
-  notes: text("notes"),
-  tags: text("tags").array(),
-  tradeDate: timestamp("trade_date").notNull(),
-  expirationDate: timestamp("expiration_date").notNull(),
-  legs: jsonb("legs").default('[]'),
-  profitLoss: decimal("profit_loss"),
-  isWin: boolean("is_win"),
-  returnPercentage: decimal("return_percentage"),
-  closeDate: timestamp("close_date"),
-  closePrice: decimal("close_price"),
-  wasAssigned: boolean("was_assigned").default(false),
-  sharesAssigned: integer("shares_assigned"),
-  assignmentPrice: decimal("assignment_price"),
-  affectedSharePositionId: integer("affected_share_position_id"),
-  // Add capital usage tracking
-  capitalUsed: decimal("capital_used").notNull().default('0'),
-  marginUsed: decimal("margin_used").default('0'),
-});
 
 export const insertUserSchema = createInsertSchema(users)
   .omit({
@@ -148,39 +234,16 @@ export const insertUserSchema = createInsertSchema(users)
     rank: true
   });
 
-export const insertTradeSchema = createInsertSchema(trades)
+export const insertTransactionSchema = createInsertSchema(accountTransactions)
   .omit({
     id: true,
     userId: true,
-    profitLoss: true,
-    isWin: true,
-    returnPercentage: true
+    date: true
   })
   .extend({
-    optionType: z.enum(optionTypes),
-    strikePrice: basePremiumSchema.optional(),
-    premium: basePremiumSchema,
-    quantity: z.number().int().positive(),
-    legs: z.array(optionLegSchema).optional(),
-    tradeDate: z.string().transform((val) => {
-      const date = new Date(val);
-      if (isNaN(date.getTime())) throw new Error("Invalid trade date");
-      return date;
-    }),
-    expirationDate: z.string().transform((val) => {
-      const date = new Date(val);
-      if (isNaN(date.getTime())) throw new Error("Invalid expiration date");
-      return date;
-    }),
-    sharesAssigned: z.number().int().optional(),
-    assignmentPrice: basePremiumSchema.optional(),
-  }).superRefine((data, ctx) => {
-    // Transform premium based on option type
-    if (debitOptionTypes.includes(data.optionType as typeof debitOptionTypes[number])) {
-      data.premium = -Math.abs(data.premium);
-    } else {
-      data.premium = Math.abs(data.premium);
-    }
+    type: z.enum(transactionTypes),
+    amount: z.number().positive(),
+    date: z.string().transform((val) => new Date(val))
   });
 
 export const userPreferencesSchema = z.object({
@@ -192,7 +255,6 @@ export const userPreferencesSchema = z.object({
   }).default({}),
 });
 
-// Platform settings schema updated to include margin configuration
 export const platformSettingsSchema = z.object({
   id: z.enum(tradingPlatforms),
   name: z.string(),
@@ -220,19 +282,7 @@ export const updateUserSchema = createInsertSchema(users)
     preferences: userPreferencesSchema.default({}),
   });
 
-// Add transaction schema
-export const insertTransactionSchema = createInsertSchema(accountTransactions)
-  .omit({
-    id: true,
-    userId: true,
-    date: true
-  })
-  .extend({
-    type: z.enum(transactionTypes),
-    amount: z.number().positive(),
-    date: z.string().transform((val) => new Date(val))
-  });
-
+// Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
@@ -242,6 +292,8 @@ export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 export type SharePosition = typeof sharePositions.$inferSelect;
 export type InsertSharePosition = z.infer<typeof insertSharePositionSchema>;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type AccountTransaction = typeof accountTransactions.$inferSelect;
 
 export type LeaderboardMetric = "totalProfitLoss" | "winRate" | "tradeCount" | "averageReturn";
 
@@ -252,6 +304,3 @@ export const leaderboardMetricSchema = z.object({
 });
 
 export type LeaderboardQuery = z.infer<typeof leaderboardMetricSchema>;
-
-export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
-export type AccountTransaction = typeof accountTransactions.$inferSelect;

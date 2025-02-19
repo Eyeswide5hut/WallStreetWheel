@@ -31,16 +31,16 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [page, setPage] = useState(1);
 
-  // Only fetch trades if we don't have initialTrades
   const { data: fetchedTrades, isLoading } = useQuery<Trade[]>({
     queryKey: ["/api/trades"],
     enabled: !initialTrades,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
   });
 
   const trades = initialTrades || fetchedTrades;
 
-  const formatCurrency = (value: string | number) => {
+  const formatCurrency = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined) return "-";
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -59,6 +59,37 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
     setSelectedTrade(trade);
   };
 
+  const getTradeValue = (trade: Trade) => {
+    if (trade.tradeType === 'option' && trade.premium) {
+      return formatCurrency(parseFloat(trade.premium.toString()) * 100 * trade.quantity);
+    } else if (trade.entryPrice) {
+      return formatCurrency(parseFloat(trade.entryPrice.toString()) * trade.quantity);
+    }
+    return "-";
+  };
+
+  const getTradeDetails = (trade: Trade) => {
+    if (trade.tradeType === 'option') {
+      return `${formatCurrency(trade.strikePrice)} Strike`;
+    }
+    return `${trade.quantity} @ ${formatCurrency(trade.entryPrice)}`;
+  };
+
+  const getTradeStatus = (trade: Trade) => {
+    if (trade.tradeType === 'option') {
+      if (trade.wasAssigned) return "Assigned";
+      if (trade.closeDate) return "Closed";
+      return "Open";
+    }
+    return trade.closeDate ? "Closed" : "Open";
+  };
+
+  const getStatusVariant = (trade: Trade) => {
+    if (trade.wasAssigned) return "yellow";
+    if (trade.closeDate) return "secondary";
+    return "outline";
+  };
+
   const totalPages = trades ? Math.ceil(trades.length / PAGE_SIZE) : 0;
   const startIndex = (page - 1) * PAGE_SIZE;
   const paginatedTrades = trades?.slice(startIndex, startIndex + PAGE_SIZE);
@@ -73,10 +104,10 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>Asset</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Strike</TableHead>
-              <TableHead>Premium</TableHead>
+              <TableHead>Asset</TableHead>
+              <TableHead>Details</TableHead>
+              <TableHead>Value</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>P/L</TableHead>
               {!readOnly && <TableHead className="text-right">Actions</TableHead>}
@@ -98,18 +129,20 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
                 <TableCell>
                   {new Date(trade.tradeDate).toLocaleDateString()}
                 </TableCell>
-                <TableCell>{trade.underlyingAsset}</TableCell>
                 <TableCell className="capitalize">
-                  {trade.optionType.replace(/_/g, ' ')}
+                  {trade.tradeType === 'option'
+                    ? trade.optionType?.replace(/_/g, ' ')
+                    : trade.tradeType.replace(/_/g, ' ')}
                 </TableCell>
-                <TableCell>{formatCurrency(trade.strikePrice || 0)}</TableCell>
-                <TableCell>{formatCurrency(trade.premium)}</TableCell>
+                <TableCell>{trade.underlyingAsset}</TableCell>
+                <TableCell>{getTradeDetails(trade)}</TableCell>
+                <TableCell>{getTradeValue(trade)}</TableCell>
                 <TableCell>
-                  <Badge 
-                    variant={trade.closeDate ? "secondary" : "outline"}
+                  <Badge
+                    variant={getStatusVariant(trade)}
                     className={trade.wasAssigned ? "bg-yellow-100 text-yellow-800" : ""}
                   >
-                    {trade.wasAssigned ? "Assigned" : (trade.closeDate ? "Closed" : "Open")}
+                    {getTradeStatus(trade)}
                   </Badge>
                 </TableCell>
                 <TableCell className={`font-medium ${
