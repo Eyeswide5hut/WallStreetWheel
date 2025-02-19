@@ -115,7 +115,46 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
         </DialogHeader>
 
         <div className="py-4">
-          {readOnly ? (
+          <div className="space-y-4">
+            <div>
+              <h4 className="font-medium">Strike Price</h4>
+              <p>${trade.strikePrice}</p>
+            </div>
+            <div>
+              <h4 className="font-medium">{isOption ? 'Premium' : 'Entry Price'}</h4>
+              <p>${trade.premium || trade.entryPrice}</p>
+            </div>
+            <div>
+              <h4 className="font-medium">Quantity</h4>
+              <p>{trade.quantity}</p>
+            </div>
+            {trade.closeDate && (
+              <>
+                <div>
+                  <h4 className="font-medium">Close Price</h4>
+                  <p>${trade.closePrice}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Close Date</h4>
+                  <p>{new Date(trade.closeDate).toLocaleDateString()}</p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {!readOnly && !trade.closeDate && (
+            <div className="mt-6">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setIsProcessing(true)}
+              >
+                Close Position
+              </Button>
+            </div>
+          )}
+
+          {!readOnly && isProcessing ? (
             <div className="space-y-4">
               <div>
                 <h4 className="font-medium">Strike Price</h4>
