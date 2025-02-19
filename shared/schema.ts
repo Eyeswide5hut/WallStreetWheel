@@ -40,6 +40,20 @@ export const optionTypes = [
   ...spreadOptionTypes,
 ] as const;
 
+// Add transaction types
+export const transactionTypes = ["deposit", "withdrawal"] as const;
+
+// Add accountTransactions table
+export const accountTransactions = pgTable("account_transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  type: text("type").notNull(),
+  amount: decimal("amount").notNull(),
+  date: timestamp("date").defaultNow(),
+  notes: text("notes"),
+});
+
+// Modify users table to include balance tracking
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -51,6 +65,10 @@ export const users = pgTable("users", {
   tradeCount: integer("trade_count").default(0),
   winCount: integer("win_count").default(0),
   averageReturn: decimal("average_return").default('0'),
+  currentBalance: decimal("current_balance").default('0'),
+  totalDeposited: decimal("total_deposited").default('0'),
+  totalWithdrawn: decimal("total_withdrawn").default('0'),
+  totalCapitalUsed: decimal("total_capital_used").default('0'),
   rank: integer("rank"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -88,12 +106,13 @@ export const insertSharePositionSchema = createInsertSchema(sharePositions)
     averageCost: z.number().positive(),
   });
 
+// Update trades table to include capital usage tracking
 export const trades = pgTable("trades", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   underlyingAsset: text("underlying_asset").notNull(),
   optionType: text("option_type").notNull(),
-  strikePrice: decimal("strike_price"),  // For single-leg trades
+  strikePrice: decimal("strike_price"),
   premium: decimal("premium").notNull(),
   quantity: integer("quantity").notNull(),
   platform: text("platform"),
@@ -102,16 +121,19 @@ export const trades = pgTable("trades", {
   tags: text("tags").array(),
   tradeDate: timestamp("trade_date").notNull(),
   expirationDate: timestamp("expiration_date").notNull(),
-  legs: jsonb("legs").default('[]'), // For multi-leg trades
+  legs: jsonb("legs").default('[]'),
   profitLoss: decimal("profit_loss"),
   isWin: boolean("is_win"),
   returnPercentage: decimal("return_percentage"),
   closeDate: timestamp("close_date"),
   closePrice: decimal("close_price"),
   wasAssigned: boolean("was_assigned").default(false),
-  sharesAssigned: integer("shares_assigned"), // Number of shares assigned/called away
-  assignmentPrice: decimal("assignment_price"), // Price at which shares were assigned/called
-  affectedSharePositionId: integer("affected_share_position_id"), // Reference to the share position affected
+  sharesAssigned: integer("shares_assigned"),
+  assignmentPrice: decimal("assignment_price"),
+  affectedSharePositionId: integer("affected_share_position_id"),
+  // Add capital usage tracking
+  capitalUsed: decimal("capital_used").notNull().default('0'),
+  marginUsed: decimal("margin_used").default('0'),
 });
 
 export const insertUserSchema = createInsertSchema(users)
@@ -198,6 +220,19 @@ export const updateUserSchema = createInsertSchema(users)
     preferences: userPreferencesSchema.default({}),
   });
 
+// Add transaction schema
+export const insertTransactionSchema = createInsertSchema(accountTransactions)
+  .omit({
+    id: true,
+    userId: true,
+    date: true
+  })
+  .extend({
+    type: z.enum(transactionTypes),
+    amount: z.number().positive(),
+    date: z.string().transform((val) => new Date(val))
+  });
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
@@ -217,3 +252,6 @@ export const leaderboardMetricSchema = z.object({
 });
 
 export type LeaderboardQuery = z.infer<typeof leaderboardMetricSchema>;
+
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type AccountTransaction = typeof accountTransactions.$inferSelect;

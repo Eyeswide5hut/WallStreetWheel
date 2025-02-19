@@ -1,4 +1,6 @@
-import { type InsertUser, type User, type Trade, type InsertTrade, users, trades, sharePositions, type SharePosition, type InsertSharePosition } from "@shared/schema";
+import { type InsertUser, type User, type Trade, type InsertTrade, users, trades, sharePositions, 
+  type SharePosition, type InsertSharePosition, type InsertTransaction, type AccountTransaction,
+  accountTransactions } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import session from "express-session";
@@ -9,6 +11,7 @@ import { type UpdateUser, type LeaderboardMetric } from "@shared/schema";
 const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
+  // Existing methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
@@ -27,6 +30,16 @@ export interface IStorage {
   getSharePositions(userId: number): Promise<SharePosition[]>;
   updateSharePosition(userId: number, symbol: string, quantity: number, cost: number): Promise<SharePosition>;
   createSharePosition(userId: number, position: InsertSharePosition): Promise<SharePosition>;
+
+  // New methods for account transactions
+  createTransaction(userId: number, transaction: InsertTransaction): Promise<AccountTransaction>;
+  getUserTransactions(userId: number): Promise<AccountTransaction[]>;
+  getUserBalance(userId: number): Promise<{
+    currentBalance: string;
+    totalDeposited: string;
+    totalWithdrawn: string;
+    totalCapitalUsed: string;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -42,6 +55,166 @@ export class DatabaseStorage implements IStorage {
     };
 
     this.sessionStore = new PostgresSessionStore(pgStoreOptions);
+  }
+
+  async createTransaction(userId: number, transaction: InsertTransaction): Promise<AccountTransaction> {
+    try {
+      let newTransaction: AccountTransaction;
+
+      await db.transaction(async (tx) => {
+        // Create the transaction
+        const [txn] = await tx.insert(accountTransactions)
+          .values({
+            userId,
+            type: transaction.type,
+            amount: transaction.amount.toString(),
+            date: transaction.date,
+            notes: transaction.notes
+          })
+          .returning();
+
+        newTransaction = txn;
+
+        // Get current user balance with null checks
+        const [user] = await tx.select({
+          currentBalance: users.currentBalance,
+          totalDeposited: users.totalDeposited,
+          totalWithdrawn: users.totalWithdrawn,
+        })
+        .from(users)
+        .where(eq(users.id, userId));
+
+        if (!user) {
+          throw new Error('User not found');
+        }
+
+        // Parse values with null checks
+        const currentBalance = parseFloat(user.currentBalance?.toString() || '0');
+        const totalDeposited = parseFloat(user.totalDeposited?.toString() || '0');
+        const totalWithdrawn = parseFloat(user.totalWithdrawn?.toString() || '0');
+
+        const amount = transaction.amount;
+        const newBalance = transaction.type === 'deposit' 
+          ? currentBalance + amount
+          : currentBalance - amount;
+
+        // Update user balance
+        await tx.update(users)
+          .set({
+            currentBalance: newBalance.toString(),
+            totalDeposited: transaction.type === 'deposit' 
+              ? (totalDeposited + amount).toString()
+              : totalDeposited.toString(),
+            totalWithdrawn: transaction.type === 'withdrawal'
+              ? (totalWithdrawn + amount).toString()
+              : totalWithdrawn.toString(),
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+      });
+
+      return newTransaction!;
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      throw new Error('Failed to create transaction');
+    }
+  }
+
+  async getUserTransactions(userId: number): Promise<AccountTransaction[]> {
+    return db
+      .select()
+      .from(accountTransactions)
+      .where(eq(accountTransactions.userId, userId))
+      .orderBy(sql`${accountTransactions.date} DESC`);
+  }
+
+  async getUserBalance(userId: number): Promise<{
+    currentBalance: string;
+    totalDeposited: string;
+    totalWithdrawn: string;
+    totalCapitalUsed: string;
+  }> {
+    const [user] = await db
+      .select({
+        currentBalance: users.currentBalance,
+        totalDeposited: users.totalDeposited,
+        totalWithdrawn: users.totalWithdrawn,
+        totalCapitalUsed: users.totalCapitalUsed,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user) {
+      return {
+        currentBalance: '0',
+        totalDeposited: '0',
+        totalWithdrawn: '0',
+        totalCapitalUsed: '0'
+      };
+    }
+
+    return {
+      currentBalance: user.currentBalance?.toString() || '0',
+      totalDeposited: user.totalDeposited?.toString() || '0',
+      totalWithdrawn: user.totalWithdrawn?.toString() || '0',
+      totalCapitalUsed: user.totalCapitalUsed?.toString() || '0'
+    };
+  }
+
+  async createTrade(userId: number, insertTrade: InsertTrade): Promise<Trade> {
+    try {
+      let createdTrade: Trade;
+
+      await db.transaction(async (tx) => {
+        const [trade] = await tx.insert(trades)
+          .values({
+            userId,
+            underlyingAsset: insertTrade.underlyingAsset,
+            optionType: insertTrade.optionType,
+            strikePrice: insertTrade.strikePrice?.toString(),
+            premium: insertTrade.premium.toString(),
+            quantity: insertTrade.quantity,
+            platform: insertTrade.platform,
+            useMargin: insertTrade.useMargin,
+            notes: insertTrade.notes,
+            tags: insertTrade.tags,
+            tradeDate: insertTrade.tradeDate,
+            expirationDate: insertTrade.expirationDate,
+            legs: insertTrade.legs,
+            // Calculate capital used based on trade type
+            capitalUsed: (Math.abs(insertTrade.premium) * insertTrade.quantity * 100).toString(),
+          })
+          .returning();
+
+        createdTrade = trade;
+
+        // Update user's total capital used
+        const [user] = await tx.select({
+          totalCapitalUsed: users.totalCapitalUsed,
+        })
+        .from(users)
+        .where(eq(users.id, userId));
+
+        if (!user) {
+          throw new Error('User not found');
+        }
+
+        const currentCapitalUsed = parseFloat(user.totalCapitalUsed?.toString() || '0');
+        const newCapitalUsed = currentCapitalUsed + parseFloat(trade.capitalUsed);
+
+        await tx.update(users)
+          .set({
+            totalCapitalUsed: newCapitalUsed.toString(),
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+      });
+
+      return createdTrade!;
+    } catch (error) {
+      console.error('Error creating trade:', error);
+      throw new Error('Failed to create trade');
+    }
   }
 
   async getUser(id: number): Promise<User | undefined> {
@@ -87,26 +260,6 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
-  }
-
-  async createTrade(userId: number, insertTrade: InsertTrade): Promise<Trade> {
-    try {
-      const trade = {
-        ...insertTrade,
-        userId,
-        strikePrice: insertTrade.strikePrice?.toString(),
-        premium: insertTrade.premium.toString(),
-      };
-
-      const [createdTrade] = await db.insert(trades)
-        .values(trade)
-        .returning();
-
-      return createdTrade;
-    } catch (error) {
-      console.error('Error creating trade:', error);
-      throw new Error('Failed to create trade');
-    }
   }
 
   async getUserTrades(userId: number): Promise<Trade[]> {
