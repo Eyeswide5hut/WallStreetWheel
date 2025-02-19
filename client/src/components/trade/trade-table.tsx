@@ -176,7 +176,11 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
                       : "text-red-600"
                     : ""
                 }`}>
-                  {trade.profitLoss && formatCurrency(trade.profitLoss)}
+                  {trade.profitLoss ? formatCurrency(trade.profitLoss) : (
+                    trade.closePrice && trade.entryPrice 
+                      ? formatCurrency((parseFloat(trade.closePrice.toString()) - parseFloat(trade.entryPrice.toString())) * trade.quantity)
+                      : '-'
+                  )}
                 </TableCell>
                 <TableCell className={`text-right font-medium ${
                   trade.profitLossPercent
