@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { updateUserSchema, insertSharePositionSchema, tradingPlatforms, platformSettingsSchema, type UpdateUser, type SharePosition } from "@shared/schema";
+import { User, insertUserSchema, updateUserSchema, insertSharePositionSchema, tradingPlatforms, type UpdateUser, type SharePosition } from "@shared/schema";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { SiRobinhood, SiWebmoney, SiTradingview } from "react-icons/si";
-import { Settings2, Plus, Trash2, History } from "lucide-react";
+import { Settings2, Plus, Trash2, History, CreditCard } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -17,14 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -41,20 +34,22 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { NavHeader } from "@/components/layout/nav-header";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-const platformIcons: Record<string, React.ElementType> = {
-  robinhood: SiRobinhood,
-  webull: SiWebmoney,
-  td_ameritrade: SiTradingview,
+type BalanceAdjustment = {
+  type: 'deposit' | 'withdrawal';
+  amount: number;
+  platformIndex: number;
 };
 
 export default function ProfileSettings() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedPosition, setSelectedPosition] = useState<SharePosition | null>(null);
+  const [balanceAdjustment, setBalanceAdjustment] = useState<BalanceAdjustment | null>(null);
 
   const form = useForm<UpdateUser>({
     resolver: zodResolver(updateUserSchema),
@@ -172,6 +167,46 @@ export default function ProfileSettings() {
     },
   });
 
+  const adjustBalanceMutation = useMutation({
+    mutationFn: async (data: BalanceAdjustment) => {
+      const platforms = form.getValues("platforms");
+      const platform = platforms[data.platformIndex];
+
+      const updatedPlatform = {
+        ...platform,
+        currentBalance: platform.currentBalance + (data.type === 'deposit' ? data.amount : -data.amount),
+        totalDeposited: data.type === 'deposit' ? platform.totalDeposited + data.amount : platform.totalDeposited,
+        totalWithdrawn: data.type === 'withdrawal' ? platform.totalWithdrawn + data.amount : platform.totalWithdrawn,
+      };
+
+      platforms[data.platformIndex] = updatedPlatform;
+      const formData = form.getValues();
+      formData.platforms = platforms;
+
+      const res = await apiRequest("PATCH", "/api/user/profile", formData);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      toast({ title: "Balance adjusted successfully" });
+      setBalanceAdjustment(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to adjust balance",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const balanceAdjustmentForm = useForm({
+    defaultValues: {
+      type: 'deposit' as const,
+      amount: 0,
+    },
+  });
+
   const addPlatform = () => {
     const platforms = form.getValues("platforms") || [];
     form.setValue("platforms", [
@@ -187,7 +222,12 @@ export default function ProfileSettings() {
           exercise: 0.0,
         },
         marginEnabled: false,
-        marginRate: undefined
+        marginRate: undefined,
+        currentBalance: 0,
+        totalDeposited: 0,
+        totalWithdrawn: 0,
+        totalFees: 0,
+        accountValue: 0
       },
     ]);
   };
@@ -241,7 +281,7 @@ export default function ProfileSettings() {
 
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-medium">Trading Platforms</h3>
+                        <h3 className="text-lg font-medium">Platform Accounts</h3>
                         <Button
                           type="button"
                           variant="outline"
@@ -249,11 +289,11 @@ export default function ProfileSettings() {
                           onClick={addPlatform}
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Add Platform
+                          Add Account
                         </Button>
                       </div>
 
-                      {form.watch("platforms")?.map((_, index) => (
+                      {form.watch("platforms")?.map((platform, index) => (
                         <Card key={index}>
                           <CardHeader>
                             <div className="flex items-center justify-between">
@@ -309,6 +349,63 @@ export default function ProfileSettings() {
                                   </FormItem>
                                 )}
                               />
+
+                              {/* Account Balance Section */}
+                              <div className="space-y-4 border rounded-lg p-4">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="font-medium">Account Balance</h4>
+                                  <DialogTrigger
+                                    asChild
+                                    open={balanceAdjustment !== null}
+                                    onOpenChange={(open) => {
+                                      if (open) {
+                                        setBalanceAdjustment({ type: 'deposit', amount: 0, platformIndex: index });
+                                      } else {
+                                        setBalanceAdjustment(null);
+                                      }
+                                    }}
+                                  >
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                    >
+                                      <CreditCard className="h-4 w-4 mr-2" />
+                                      Adjust Balance
+                                    </Button>
+                                  </DialogTrigger>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Current Balance</p>
+                                    <p className="text-2xl font-bold">
+                                      ${parseFloat(platform.currentBalance || "0").toFixed(2)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">Account Value</p>
+                                    <p className="text-2xl font-bold">
+                                      ${parseFloat(platform.accountValue || platform.currentBalance || "0").toFixed(2)}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Total Deposited</p>
+                                    <p className="font-medium">${parseFloat(platform.totalDeposited || "0").toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Total Withdrawn</p>
+                                    <p className="font-medium">${parseFloat(platform.totalWithdrawn || "0").toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Total Fees</p>
+                                    <p className="font-medium">${parseFloat(platform.totalFees || "0").toFixed(2)}</p>
+                                  </div>
+                                </div>
+                              </div>
+
                               <FormField
                                 control={form.control}
                                 name={`platforms.${index}.marginEnabled`}
@@ -586,6 +683,84 @@ export default function ProfileSettings() {
               </div>
             ))}
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Balance Adjustment Dialog */}
+      <Dialog
+        open={balanceAdjustment !== null}
+        onOpenChange={(open) => !open && setBalanceAdjustment(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjust Account Balance</DialogTitle>
+            <DialogDescription>
+              Enter the amount to deposit or withdraw from your account
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...balanceAdjustmentForm}>
+            <form
+              onSubmit={balanceAdjustmentForm.handleSubmit((data) => {
+                if (balanceAdjustment) {
+                  adjustBalanceMutation.mutate({
+                    ...data,
+                    platformIndex: balanceAdjustment.platformIndex,
+                  });
+                }
+              })}
+              className="space-y-4"
+            >
+              <FormField
+                control={balanceAdjustmentForm.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Transaction Type</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="deposit">Deposit</SelectItem>
+                        <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={balanceAdjustmentForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Enter amount"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={adjustBalanceMutation.isPending}
+              >
+                Confirm
+              </Button>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

@@ -268,6 +268,11 @@ export const platformSettingsSchema = z.object({
     exercise: z.number().default(0),
   }),
   enabled: z.boolean().default(true),
+  currentBalance: z.number().default(0),
+  totalDeposited: z.number().default(0),
+  totalWithdrawn: z.number().default(0),
+  totalFees: z.number().default(0),
+  accountValue: z.number().default(0),
 });
 
 export const updateUserSchema = createInsertSchema(users)
