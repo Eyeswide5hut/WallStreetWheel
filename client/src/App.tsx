@@ -11,6 +11,8 @@ import ProfileSettings from "@/pages/profile-settings";
 import LeaderboardPage from "@/pages/leaderboard-page";
 import TraderDashboard from "@/pages/trader-dashboard";
 import { ProtectedRoute } from "./lib/protected-route";
+import './index.css'
+import { ThemeProvider } from "@/components/theme-provider"
 
 function Router() {
   return (
@@ -30,8 +32,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router />
-        <Toaster />
+        <ThemeProvider>
+          <Router />
+          <Toaster />
+        </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

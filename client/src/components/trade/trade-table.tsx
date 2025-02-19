@@ -34,7 +34,8 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
   // Only fetch trades if we don't have initialTrades
   const { data: fetchedTrades, isLoading } = useQuery<Trade[]>({
     queryKey: ["/api/trades"],
-    enabled: !initialTrades, // Only fetch if we don't have initialTrades
+    enabled: !initialTrades,
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   const trades = initialTrades || fetchedTrades;
