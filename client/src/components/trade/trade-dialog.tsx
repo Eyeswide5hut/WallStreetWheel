@@ -26,7 +26,7 @@ import { z } from "zod";
 import { Loader2 } from "lucide-react";
 
 const tradeCloseSchema = z.object({
-  closePrice: z.coerce.number().min(0, "Price must be positive"),
+  closePrice: z.string().transform((val) => Number(val) || 0),
   closeDate: z.string(),
   wasAssigned: z.boolean().default(false)
 });
@@ -47,10 +47,8 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
   const form = useForm<TradeCloseData>({
     resolver: zodResolver(tradeCloseSchema),
     defaultValues: {
-      closePrice: trade?.closePrice ? Number(trade.closePrice) : 0,
-      closeDate: trade?.closeDate 
-        ? new Date(trade.closeDate).toISOString().split('T')[0] 
-        : new Date().toISOString().split('T')[0],
+      closePrice: trade?.closePrice?.toString() ?? "",
+      closeDate: trade?.closeDate ? new Date(trade.closeDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       wasAssigned: trade?.wasAssigned ?? false
     }
   });
@@ -59,9 +57,10 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
     mutationFn: async (data: TradeCloseData) => {
       if (!trade?.id) throw new Error("No trade selected");
 
+      // Ensure proper number formatting for closePrice
       const formattedData = {
         ...data,
-        closeDate: new Date(data.closeDate),
+        closePrice: Number(data.closePrice),
       };
 
       const response = await apiRequest("PATCH", `/api/trades/${trade.id}`, formattedData);
@@ -155,7 +154,7 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
                         </FormControl>
                         <div className="space-y-1 leading-none">
                           <FormLabel>
-                            {isOption ? 'Exercise option' : 'Close position'}
+                            Position was {isOption ? 'assigned/exercised' : 'called away'}
                           </FormLabel>
                         </div>
                       </FormItem>
@@ -163,26 +162,27 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
                   />
                 )}
 
-                <FormField
-                  control={form.control}
-                  name="closePrice"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isOption ? 'Option Value' : 'Share Price'}</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder={`Enter ${isOption ? 'option value' : 'share price'}`}
-                          {...field}
-                          onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {!wasAssigned && (
+                  <FormField
+                    control={form.control}
+                    name="closePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{isOption ? 'Option Value' : 'Share Price'}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder={`Enter ${isOption ? 'option value' : 'share price'}`}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <FormField
                   control={form.control}

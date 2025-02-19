@@ -10,8 +10,6 @@ import { type UpdateUser } from "@shared/schema";
 
 const PostgresSessionStore = connectPg(session);
 
-type LeaderboardMetric = 'totalProfitLoss' | 'tradeCount' | 'averageReturn' | 'winRate';
-
 export interface IStorage {
   sessionStore: session.Store;
   getUser(id: number): Promise<User | undefined>;
@@ -30,13 +28,6 @@ export interface IStorage {
     totalWithdrawn: string;
     totalCapitalUsed: string;
   }>;
-  closeTrade(tradeId: number, closeData: CloseTradeData): Promise<Trade>;
-}
-
-interface CloseTradeData {
-  closePrice: number;
-  closeDate: Date;
-  wasAssigned: boolean;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -175,8 +166,8 @@ export class DatabaseStorage implements IStorage {
           totalDeposited: users.totalDeposited,
           totalWithdrawn: users.totalWithdrawn,
         })
-          .from(users)
-          .where(eq(users.id, userId));
+        .from(users)
+        .where(eq(users.id, userId));
 
         if (!user) {
           throw new Error('User not found');
@@ -188,7 +179,7 @@ export class DatabaseStorage implements IStorage {
         const totalWithdrawn = parseFloat(user.totalWithdrawn?.toString() || '0');
 
         const amount = transaction.amount;
-        const newBalance = transaction.type === 'deposit'
+        const newBalance = transaction.type === 'deposit' 
           ? currentBalance + amount
           : currentBalance - amount;
 
@@ -196,7 +187,7 @@ export class DatabaseStorage implements IStorage {
         await tx.update(users)
           .set({
             currentBalance: newBalance.toString(),
-            totalDeposited: transaction.type === 'deposit'
+            totalDeposited: transaction.type === 'deposit' 
               ? (totalDeposited + amount).toString()
               : totalDeposited.toString(),
             totalWithdrawn: transaction.type === 'withdrawal'
@@ -286,8 +277,8 @@ export class DatabaseStorage implements IStorage {
         const [user] = await tx.select({
           totalCapitalUsed: users.totalCapitalUsed,
         })
-          .from(users)
-          .where(eq(users.id, userId));
+        .from(users)
+        .where(eq(users.id, userId));
 
         if (!user) {
           throw new Error('User not found');
@@ -386,10 +377,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async closeTrade(tradeId: number, closeData: CloseTradeData): Promise<Trade> {
+  async closeTrade(tradeId: number, closeData: {
+    closePrice: number;
+    closeDate: Date;
+    wasAssigned: boolean;
+  }): Promise<Trade> {
     try {
-      console.log('Closing trade:', { tradeId, closeData });
-
       const [trade] = await db
         .select()
         .from(trades)
@@ -399,89 +392,110 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Trade not found");
       }
 
-      console.log('Found trade:', trade);
-
       if (trade.closeDate) {
         throw new Error("Trade is already closed");
       }
 
-      // Validate close date
-      const closeDate = closeData.closeDate;
+      // Validate close date is between trade date and expiration
+      const closeDate = new Date(closeData.closeDate);
       const tradeDate = new Date(trade.tradeDate);
-      const expirationDate = trade.expirationDate ? new Date(trade.expirationDate) : null;
+      const expirationDate = new Date(trade.expirationDate);
 
       if (closeDate < tradeDate) {
         throw new Error("Close date cannot be before trade open date");
       }
 
-      if (expirationDate && closeDate > expirationDate) {
+      if (closeDate > expirationDate) {
         throw new Error("Close date cannot be after expiration date");
       }
 
-      // Validate and convert numeric values
-      if (!trade.premium && !trade.entryPrice) {
-        throw new Error("Trade must have either premium or entry price");
-      }
+      let profitLoss: number;
+      let sharesAssigned = 0;
+      let assignmentPrice = null;
+      let affectedSharePositionId = null;
 
-      const premium = trade.premium ? Number(trade.premium) : 0;
-      const entryPrice = trade.entryPrice ? Number(trade.entryPrice) : 0;
+      // Calculate P/L based on option type and assignment status
+      const premium = parseFloat(trade.premium.toString());
       const quantity = trade.quantity;
-      const strikePrice = trade.strikePrice ? Number(trade.strikePrice) : 0;
+      const strikePrice = parseFloat(trade.strikePrice?.toString() || '0');
 
-      console.log('Trade values:', {
-        premium,
-        entryPrice,
-        quantity,
-        strikePrice,
-        tradeType: trade.tradeType,
-        optionType: trade.optionType
-      });
+      if (closeData.wasAssigned) {
+        // Handle assignment cases
+        switch (trade.optionType) {
+          case "covered_call": {
+            // Shares are called away at strike price
+            sharesAssigned = -100 * quantity; // Negative because shares are called away
+            assignmentPrice = strikePrice;
 
-      let profitLoss = 0;
+            // Find existing share position
+            const [sharePosition] = await db
+              .select()
+              .from(sharePositions)
+              .where(sql`user_id = ${trade.userId} AND symbol = ${trade.underlyingAsset}`);
 
-      if (trade.tradeType === 'option') {
-        if (closeData.wasAssigned) {
-          switch (trade.optionType) {
-            case "covered_call":
-              profitLoss = (strikePrice * quantity * 100) - (entryPrice * quantity * 100) + (premium * quantity * 100);
-              break;
-            case "cash_secured_put":
-              profitLoss = (premium * quantity * 100) - ((strikePrice - closeData.closePrice) * quantity * 100);
-              break;
-            case "long_call":
-              profitLoss = ((closeData.closePrice - strikePrice) * quantity * 100) - (premium * quantity * 100);
-              break;
-            case "long_put":
-              profitLoss = ((strikePrice - closeData.closePrice) * quantity * 100) - (premium * quantity * 100);
-              break;
-            default:
-              throw new Error(`Assignment not supported for ${trade.optionType}`);
+            if (!sharePosition || sharePosition.quantity < Math.abs(sharesAssigned)) {
+              throw new Error("Insufficient shares for covered call assignment");
+            }
+
+            // P/L = (Strike Price - Average Cost) * Shares + Premium
+            const avgCost = parseFloat(sharePosition.averageCost.toString());
+            profitLoss = ((strikePrice - avgCost) * Math.abs(sharesAssigned)) + (premium * quantity * 100);
+            affectedSharePositionId = sharePosition.id;
+            break;
           }
-        } else {
-          // Regular close without assignment
-          if (['covered_call', 'cash_secured_put', 'naked_call', 'naked_put'].includes(trade.optionType || '')) {
-            profitLoss = (premium * quantity * 100) - (closeData.closePrice * quantity * 100);
-          } else {
-            profitLoss = (closeData.closePrice * quantity * 100) - (premium * quantity * 100);
+          case "cash_secured_put": {
+            // Shares are assigned at strike price
+            sharesAssigned = 100 * quantity;
+            assignmentPrice = strikePrice;
+            // P/L = Premium + (Market Price - Strike Price) * Shares
+            profitLoss = (premium * quantity * 100) +
+              ((closeData.closePrice - strikePrice) * sharesAssigned);
+            break;
           }
+          case "long_call": {
+            // Exercising a long call
+            sharesAssigned = 100 * quantity;
+            assignmentPrice = strikePrice;
+            // P/L = (Market Price - Strike Price) * Shares - Premium
+            profitLoss = ((closeData.closePrice - strikePrice) * sharesAssigned) -
+              (premium * quantity * 100);
+            break;
+          }
+          case "long_put": {
+            // Exercising a long put
+            sharesAssigned = -100 * quantity;
+            assignmentPrice = strikePrice;
+            // P/L = (Strike Price - Market Price) * Shares - Premium
+            profitLoss = ((strikePrice - closeData.closePrice) * Math.abs(sharesAssigned)) -
+              (premium * quantity * 100);
+            break;
+          }
+          default:
+            throw new Error(`Assignment not supported for ${trade.optionType}`);
         }
       } else {
-        // Stock trade
-        profitLoss = ((closeData.closePrice - entryPrice) * quantity);
+        // Regular close without assignment
+        switch (trade.optionType) {
+          case "covered_call":
+          case "cash_secured_put":
+          case "naked_call":
+          case "naked_put": {
+            // Short options: profit = premium received - cost to close
+            profitLoss = (premium * quantity * 100) -
+              (closeData.closePrice * quantity * 100);
+            break;
+          }
+          case "long_call":
+          case "long_put": {
+            // Long options: profit = sale price - premium paid
+            profitLoss = (closeData.closePrice * quantity * 100) -
+              (premium * quantity * 100);
+            break;
+          }
+          default:
+            throw new Error(`Unsupported option type: ${trade.optionType}`);
+        }
       }
-
-      console.log('Calculated P/L:', { profitLoss });
-
-      const initialInvestment = trade.tradeType === 'option' 
-        ? Math.abs(premium * quantity * 100) 
-        : Math.abs(entryPrice * quantity);
-
-      const returnPercentage = (profitLoss / (initialInvestment || 1)) * 100;
-
-      console.log('Return calculation:', {
-        initialInvestment,
-        returnPercentage
-      });
 
       // Update the trade
       const [updatedTrade] = await db
@@ -492,12 +506,23 @@ export class DatabaseStorage implements IStorage {
           wasAssigned: closeData.wasAssigned,
           profitLoss: profitLoss.toString(),
           isWin: profitLoss > 0,
-          returnPercentage: returnPercentage.toString(),
+          returnPercentage: ((profitLoss / Math.abs(premium * quantity * 100)) * 100).toString(),
+          sharesAssigned,
+          assignmentPrice: assignmentPrice?.toString(),
+          affectedSharePositionId
         })
         .where(eq(trades.id, tradeId))
         .returning();
 
-      console.log('Updated trade:', updatedTrade);
+      // Update share positions if assignment occurred
+      if (closeData.wasAssigned && sharesAssigned !== 0) {
+        await this.updateSharePosition(
+          trade.userId,
+          trade.underlyingAsset,
+          sharesAssigned,
+          assignmentPrice || 0
+        );
+      }
 
       // Update user statistics
       await this.updateUserStats(trade.userId);
@@ -511,30 +536,17 @@ export class DatabaseStorage implements IStorage {
 
   private async updateUserStats(userId: number) {
     const userTrades = await db.select({
-      totalProfitLoss: sql`COALESCE(SUM(CAST(profit_loss AS DECIMAL)), 0)`,
+      totalProfitLoss: sql`SUM(CAST(profit_loss AS DECIMAL))`,
       tradeCount: sql`COUNT(*)`,
-      winCount: sql`COALESCE(SUM(CASE WHEN is_win THEN 1 ELSE 0 END), 0)`,
-    })
-    .from(trades)
-    .where(eq(trades.userId, userId))
-    .then(rows => rows[0]);
-
-    if (!userTrades) {
-      throw new Error("Failed to calculate user statistics");
-    }
-
-    const totalProfitLoss = Number(userTrades.totalProfitLoss);
-    const tradeCount = Number(userTrades.tradeCount);
-    const winCount = Number(userTrades.winCount);
-    const avgReturn = totalProfitLoss / Math.max(tradeCount, 1);
+      winCount: sql`SUM(CASE WHEN is_win THEN 1 ELSE 0 END)`,
+    }).from(trades).where(eq(trades.userId, userId)).then(rows => rows[0]);
 
     await db.update(users)
       .set({
-        totalProfitLoss: totalProfitLoss.toString(),
-        tradeCount: tradeCount,
-        winCount: winCount,
-        averageReturn: avgReturn.toString(),
-        updatedAt: new Date(),
+        totalProfitLoss: (userTrades.totalProfitLoss || 0).toString(),
+        tradeCount: Number(userTrades.tradeCount) || 0,
+        winCount: Number(userTrades.winCount) || 0,
+        averageReturn: ((Number(userTrades.totalProfitLoss) || 0) / (Number(userTrades.tradeCount) || 1)).toString()
       })
       .where(eq(users.id, userId));
   }
