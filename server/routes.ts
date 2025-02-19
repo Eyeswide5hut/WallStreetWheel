@@ -142,7 +142,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid trader ID" });
       }
 
-      const trader = await storage.getTraderProfile(traderId);
+      const trader = await storage.getUser(traderId);
       if (!trader) {
         return res.status(404).json({ error: "Trader not found" });
       }
