@@ -108,6 +108,15 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
     return "outline";
   };
 
+  const calculateUnrealizedPL = (trade: Trade): string => {
+    //  Implementation for calculating unrealized P/L based on current market price (not provided in the original data)
+    //  This is a placeholder; replace with your actual calculation logic.  You'll need access to a market data API or similar.
+    //  For example:  const currentPrice = getCurrentMarketPrice(trade.underlyingAsset);
+    //                return formatCurrency(calculatePL(trade, currentPrice));
+
+    return "-"; // Placeholder return value
+  };
+
   const totalPages = filteredTrades ? Math.ceil(filteredTrades.length / PAGE_SIZE) : 0;
   const startIndex = (page - 1) * PAGE_SIZE;
   const paginatedTrades = filteredTrades?.slice(startIndex, startIndex + PAGE_SIZE);
@@ -129,6 +138,7 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
               <TableHead className="text-right">Cost Basis</TableHead>
               <TableHead className="text-right">P/L ($)</TableHead>
               <TableHead className="text-right">P/L (%)</TableHead>
+              <TableHead className="text-right">Unrealized P/L</TableHead>
               <TableHead className="text-right">Days</TableHead>
               <TableHead>Status</TableHead>
               {!readOnly && <TableHead className="text-right">Actions</TableHead>}
@@ -176,6 +186,11 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
                     : ""
                 }`}>
                   {trade.profitLossPercent && formatPercentage(trade.profitLossPercent)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {!trade.closeDate && trade.optionType ? (
+                    calculateUnrealizedPL(trade)
+                  ) : '-'}
                 </TableCell>
                 <TableCell className="text-right">{getDaysOpen(trade)}</TableCell>
                 <TableCell>
