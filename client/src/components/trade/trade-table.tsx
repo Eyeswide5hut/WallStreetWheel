@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   Table,
   TableBody,
@@ -18,9 +18,7 @@ import { Trade } from "@shared/schema";
 import { TradeDialog } from "./trade-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type TradeTableProps = {
   initialTrades?: Trade[];
@@ -31,9 +29,7 @@ const PAGE_SIZE = 10;
 
 export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps) {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
-  const [dialogMode, setDialogMode] = useState<"view" | "edit">("view");
   const [page, setPage] = useState(1);
-  const { toast } = useToast();
 
   // Only fetch trades if we don't have initialTrades
   const { data: fetchedTrades, isLoading } = useQuery<Trade[]>({
@@ -43,28 +39,6 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
 
   const trades = initialTrades || fetchedTrades;
 
-  const deleteMutation = useMutation({
-    mutationFn: async (tradeId: number) => {
-      const response = await apiRequest("DELETE", `/api/trades/${tradeId}`);
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
-      toast({ title: "Trade deleted successfully" });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to delete trade",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const formatCurrency = (value: string | number) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return new Intl.NumberFormat('en-US', {
@@ -73,24 +47,15 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
     }).format(numValue);
   };
 
-  const handleDelete = async (tradeId: number, e: React.MouseEvent) => {
-    if (readOnly) return;
-    e.stopPropagation();
-    if (window.confirm("Are you sure you want to delete this trade?")) {
-      await deleteMutation.mutate(tradeId);
+  const handleRowClick = (trade: Trade) => {
+    if (!readOnly) {
+      setSelectedTrade(trade);
     }
   };
 
-  const handleEdit = (trade: Trade, e: React.MouseEvent) => {
-    if (readOnly) return;
+  const handleCloseTrade = (trade: Trade, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedTrade(trade);
-    setDialogMode("edit");
-  };
-
-  const handleRowClick = (trade: Trade) => {
-    setSelectedTrade(trade);
-    setDialogMode("view");
   };
 
   const totalPages = trades ? Math.ceil(trades.length / PAGE_SIZE) : 0;
@@ -148,28 +113,21 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
                 </TableCell>
                 <TableCell className={`font-medium ${
                   trade.profitLoss
-                    ? parseFloat(trade.profitLoss) > 0
+                    ? parseFloat(trade.profitLoss.toString()) > 0
                       ? "text-green-600"
                       : "text-red-600"
                     : ""
                 }`}>
                   {trade.profitLoss && formatCurrency(trade.profitLoss)}
                 </TableCell>
-                {!readOnly && (
-                  <TableCell className="text-right space-x-2">
+                {!readOnly && !trade.closeDate && (
+                  <TableCell className="text-right">
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => handleEdit(trade, e)}
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => handleCloseTrade(trade, e)}
                     >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => handleDelete(trade.id, e)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      Close Trade
                     </Button>
                   </TableCell>
                 )}
@@ -216,11 +174,7 @@ export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps)
         <TradeDialog
           trade={selectedTrade}
           isOpen={!!selectedTrade}
-          onClose={() => {
-            setSelectedTrade(null);
-            setDialogMode("view");
-          }}
-          mode={dialogMode}
+          onClose={() => setSelectedTrade(null)}
           readOnly={readOnly}
         />
       </CardContent>
