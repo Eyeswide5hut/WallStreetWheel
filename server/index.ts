@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import crypto from "crypto";
 import { storage } from "./storage";
 import session from "express-session";
+import { setupAuth } from "./auth";
 
 // Generate a session secret if not provided
 if (!process.env.SESSION_SECRET) {
@@ -17,7 +18,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Session configuration - must be before routes
-const sessionConfig = {
+const sessionConfig: session.SessionOptions = {
   secret: process.env.SESSION_SECRET!,
   resave: false,
   saveUninitialized: false,
@@ -26,16 +27,19 @@ const sessionConfig = {
     secure: app.get('env') === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax'
+    sameSite: 'lax' as const
   }
 };
 
 if (app.get("env") === "production") {
   app.set("trust proxy", 1);
-  sessionConfig.cookie.secure = true;
+  sessionConfig.cookie!.secure = true;
 }
 
 app.use(session(sessionConfig));
+
+// Setup authentication
+setupAuth(app);
 
 // Request logging middleware
 app.use((req, res, next) => {
