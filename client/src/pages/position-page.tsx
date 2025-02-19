@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
 import type { SharePosition } from "@shared/schema";
+import { NavHeader } from "@/components/layout/nav-header";
 
 export default function PositionPage() {
   const { data: positions } = useQuery<SharePosition[]>({
@@ -10,7 +11,9 @@ export default function PositionPage() {
   });
 
   return (
-    <div className="container mx-auto py-6">
+    <div>
+      <NavHeader />
+      <div className="container mx-auto py-6">
       <h1 className="text-3xl font-bold mb-6">Positions Overview</h1>
       <div className="grid gap-4">
         {positions?.map((position) => (
@@ -60,6 +63,7 @@ export default function PositionPage() {
           </Card>
         ))}
       </div>
+    </div>
     </div>
   );
 }

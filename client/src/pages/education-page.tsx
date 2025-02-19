@@ -1,10 +1,13 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NavHeader } from "@/components/layout/nav-header";
 
 export default function EducationPage() {
   return (
-    <div className="container mx-auto py-6">
+    <div>
+      <NavHeader />
+      <div className="container mx-auto py-6">
       <h1 className="text-3xl font-bold mb-6">Trading Education</h1>
       <Tabs defaultValue="basics">
         <TabsList>
@@ -67,6 +70,7 @@ export default function EducationPage() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
     </div>
   );
 }
