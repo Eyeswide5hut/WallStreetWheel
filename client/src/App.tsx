@@ -10,6 +10,8 @@ import TradeEntry from "@/pages/trade-entry";
 import ProfileSettings from "@/pages/profile-settings";
 import LeaderboardPage from "@/pages/leaderboard-page";
 import TraderDashboard from "@/pages/trader-dashboard";
+import PositionPage from "./pages/position-page";
+import EducationPage from "./pages/education-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import './index.css'
 import { ThemeProvider } from "@/components/theme-provider"
@@ -23,6 +25,8 @@ function Router() {
       <ProtectedRoute path="/leaderboard" component={LeaderboardPage} />
       <ProtectedRoute path="/traders/:id" component={TraderDashboard} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/positions" component={PositionPage} />
+      <Route path="/education" component={EducationPage} />
       <Route component={NotFound} />
     </Switch>
   );
