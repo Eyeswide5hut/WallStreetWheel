@@ -22,17 +22,26 @@ import { ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+type TradeTableProps = {
+  initialTrades?: Trade[];
+  readOnly?: boolean;
+};
+
 const PAGE_SIZE = 10;
 
-export function TradeTable() {
+export function TradeTable({ initialTrades, readOnly = false }: TradeTableProps) {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [dialogMode, setDialogMode] = useState<"view" | "edit">("view");
   const [page, setPage] = useState(1);
   const { toast } = useToast();
 
-  const { data: trades, isLoading } = useQuery<Trade[]>({
+  // Only fetch trades if we don't have initialTrades
+  const { data: fetchedTrades, isLoading } = useQuery<Trade[]>({
     queryKey: ["/api/trades"],
+    enabled: !initialTrades, // Only fetch if we don't have initialTrades
   });
+
+  const trades = initialTrades || fetchedTrades;
 
   const deleteMutation = useMutation({
     mutationFn: async (tradeId: number) => {
@@ -65,6 +74,7 @@ export function TradeTable() {
   };
 
   const handleDelete = async (tradeId: number, e: React.MouseEvent) => {
+    if (readOnly) return;
     e.stopPropagation();
     if (window.confirm("Are you sure you want to delete this trade?")) {
       await deleteMutation.mutate(tradeId);
@@ -72,6 +82,7 @@ export function TradeTable() {
   };
 
   const handleEdit = (trade: Trade, e: React.MouseEvent) => {
+    if (readOnly) return;
     e.stopPropagation();
     setSelectedTrade(trade);
     setDialogMode("edit");
@@ -102,13 +113,13 @@ export function TradeTable() {
               <TableHead>Premium</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>P/L</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              {!readOnly && <TableHead className="text-right">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-4">
+                <TableCell colSpan={readOnly ? 7 : 8} className="text-center py-4">
                   Loading trades...
                 </TableCell>
               </TableRow>
@@ -144,27 +155,29 @@ export function TradeTable() {
                 }`}>
                   {trade.profitLoss && formatCurrency(trade.profitLoss)}
                 </TableCell>
-                <TableCell className="text-right space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => handleEdit(trade, e)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => handleDelete(trade.id, e)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </TableCell>
+                {!readOnly && (
+                  <TableCell className="text-right space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => handleEdit(trade, e)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => handleDelete(trade.id, e)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
             {(!trades || trades.length === 0) && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">
+                <TableCell colSpan={readOnly ? 7 : 8} className="text-center text-muted-foreground">
                   No trades found
                 </TableCell>
               </TableRow>
@@ -208,6 +221,7 @@ export function TradeTable() {
             setDialogMode("view");
           }}
           mode={dialogMode}
+          readOnly={readOnly}
         />
       </CardContent>
     </Card>

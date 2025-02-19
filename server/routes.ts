@@ -142,10 +142,14 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid trader ID" });
       }
 
-      const trader = await storage.getUser(traderId);
+      // First check if trader exists
+      const trader = await storage.getTraderProfile(traderId);
       if (!trader) {
         return res.status(404).json({ error: "Trader not found" });
       }
+
+      // Also fetch their trades
+      const trades = await storage.getUserTrades(traderId);
 
       // Calculate derived metrics
       const winRate = trader.tradeCount ? (trader.winCount || 0) / trader.tradeCount : 0;
@@ -161,7 +165,8 @@ export function registerRoutes(app: Express): Server {
         platforms: trader.platforms,
         preferences: trader.preferences,
         rank: trader.rank,
-        winRate
+        winRate,
+        trades // Include trades in the response
       });
     } catch (error) {
       console.error('Trader profile error:', error);

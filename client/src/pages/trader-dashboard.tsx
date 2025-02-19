@@ -1,15 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NavHeader } from "@/components/layout/nav-header";
-import { User } from "@shared/schema";
+import { User, Trade } from "@shared/schema";
 import { useParams } from "wouter";
 import { Loader2 } from "lucide-react";
+import { TradeTable } from "@/components/trade/trade-table";
+
+type TraderProfile = Omit<User, "password" | "email"> & {
+  trades: Trade[];
+  winRate: number;
+};
 
 export default function TraderDashboard() {
   const params = useParams<{ id: string }>();
   const traderId = params?.id ? parseInt(params.id) : null;
 
-  const { data: trader, isLoading, error } = useQuery<User>({
+  const { data: trader, isLoading, error } = useQuery<TraderProfile>({
     queryKey: ["/api/traders", traderId],
     queryFn: async () => {
       if (!traderId) throw new Error('Trader ID is required');
@@ -50,8 +56,6 @@ export default function TraderDashboard() {
     );
   }
 
-  const winRate = trader.tradeCount ? ((trader.winCount || 0) / trader.tradeCount) * 100 : 0;
-
   return (
     <div className="min-h-screen bg-background">
       <NavHeader />
@@ -77,7 +81,7 @@ export default function TraderDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-mono">
-                  {winRate.toFixed(1)}%
+                  {(trader.winRate * 100).toFixed(1)}%
                 </p>
               </CardContent>
             </Card>
@@ -102,6 +106,11 @@ export default function TraderDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Display trades table */}
+          {trader.trades && (
+            <TradeTable initialTrades={trader.trades} readOnly />
+          )}
         </div>
       </main>
     </div>
