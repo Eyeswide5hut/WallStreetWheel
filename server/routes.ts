@@ -1,22 +1,7 @@
-
-// Add market data endpoint
-app.get('/api/market-data/:symbol', async (req, res) => {
-  try {
-    const { symbol } = req.params;
-    // Implement your market data provider integration here
-    // For example, using Alpha Vantage, Yahoo Finance, or other providers
-    const price = await fetchMarketPrice(symbol);
-    res.json({ price });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch market data' });
-  }
-});
-
-
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTradeSchema, updateUserSchema, leaderboardMetricSchema, insertSharePositionSchema } from "@shared/schema";
+import { insertTradeSchema, updateUserSchema, leaderboardMetricSchema, insertSharePositionSchema, insertTradeIdeaSchema, insertScannerConfigSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { ZodError } from "zod";
 import { z } from "zod";
@@ -28,6 +13,18 @@ const closeTradeSchema = z.object({
 });
 
 export function registerRoutes(app: Express): Server {
+  // Market data endpoint
+  app.get('/api/market-data/:symbol', async (req, res) => {
+    try {
+      const { symbol } = req.params;
+      // Implement your market data provider integration here
+      const price = await fetchMarketPrice(symbol);
+      res.json({ price });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch market data' });
+    }
+  });
+
   // User profile routes
   app.patch("/api/user/profile", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
