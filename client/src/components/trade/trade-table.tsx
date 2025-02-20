@@ -182,13 +182,15 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
                   )}
                 </TableCell>
                 <TableCell className={`text-right font-medium ${
-                  trade.profitLossPercent
-                    ? parseFloat(trade.profitLossPercent.toString()) > 0
+                  trade.profitLoss
+                    ? parseFloat(trade.profitLoss.toString()) > 0
                       ? "text-green-600"
                       : "text-red-600"
                     : ""
                 }`}>
-                  {trade.profitLossPercent && formatPercentage(trade.profitLossPercent)}
+                  {trade.profitLoss && trade.capitalUsed ? 
+                    formatPercentage((parseFloat(trade.profitLoss.toString()) / parseFloat(trade.capitalUsed.toString())) * 100)
+                    : '-'}
                 </TableCell>
                 <TableCell className="text-right">
                   {!trade.closeDate && trade.optionType ? (
