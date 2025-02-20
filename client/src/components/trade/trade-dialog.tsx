@@ -91,7 +91,7 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
   });
 
   const handleClose = () => {
-    if (isProcessing) return;
+    setIsProcessing(false);
     form.reset();
     onClose();
   };
