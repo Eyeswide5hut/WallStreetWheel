@@ -30,6 +30,7 @@ const PAGE_SIZE = 10;
 
 export function TradeTable({ initialTrades, readOnly = false, showClosed = false }: TradeTableProps) {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [tradeToClose, setTradeToClose] = useState<Trade | null>(null); // Added state for trade to close
   const [page, setPage] = useState(1);
 
   const { data: fetchedTrades, isLoading } = useQuery<Trade[]>({
@@ -39,7 +40,7 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
   });
 
   const trades = initialTrades || fetchedTrades;
-  const filteredTrades = showClosed 
+  const filteredTrades = showClosed
     ? trades?.filter(t => t.status === 'closed')
     : trades?.filter(t => t.status === 'open');
 
@@ -176,7 +177,7 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
                     : ""
                 }`}>
                   {trade.profitLoss ? formatCurrency(trade.profitLoss) : (
-                    trade.closePrice && trade.entryPrice 
+                    trade.closePrice && trade.entryPrice
                       ? formatCurrency((parseFloat(trade.closePrice.toString()) - parseFloat(trade.entryPrice.toString())) * trade.quantity)
                       : '-'
                   )}
@@ -188,7 +189,7 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
                       : "text-red-600"
                     : ""
                 }`}>
-                  {trade.profitLoss && trade.capitalUsed ? 
+                  {trade.profitLoss && trade.capitalUsed ?
                     formatPercentage((parseFloat(trade.profitLoss.toString()) / parseFloat(trade.capitalUsed.toString())) * 100)
                     : '-'}
                 </TableCell>
@@ -211,7 +212,10 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={(e) => handleRowClick(trade)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        trade.status === 'open' ? setTradeToClose(trade) : setSelectedTrade(trade);
+                      }}
                     >
                       {trade.status === 'open' ? 'Close' : 'Edit'}
                     </Button>
@@ -258,9 +262,9 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
         )}
 
         <TradeDialog
-          trade={selectedTrade}
-          isOpen={!!selectedTrade}
-          onClose={() => setSelectedTrade(null)}
+          trade={selectedTrade || tradeToClose} // Pass either selectedTrade or tradeToClose
+          isOpen={!!selectedTrade || !!tradeToClose} // Open dialog if either is set
+          onClose={() => { setSelectedTrade(null); setTradeToClose(null); }} //Added to close both dialogs
           readOnly={readOnly}
         />
       </CardContent>
