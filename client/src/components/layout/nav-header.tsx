@@ -46,6 +46,15 @@ export function NavHeader() {
                         </div>
                       </div>
                     </Link>
+                    <Link href="/latest-trades" className="block">
+                      <div className="flex items-center gap-2 p-2 hover:bg-accent rounded-md">
+                        <Users className="h-5 w-5" />
+                        <div>
+                          <h3 className="font-medium">Latest Trades</h3>
+                          <p className="text-sm text-muted-foreground">View recent trades from all users</p>
+                        </div>
+                      </div>
+                    </Link>
                   </div>
                 </NavigationMenuContent>
               </NavigationMenuItem>
