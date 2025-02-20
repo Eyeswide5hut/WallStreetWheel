@@ -1,3 +1,18 @@
+
+// Add market data endpoint
+app.get('/api/market-data/:symbol', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    // Implement your market data provider integration here
+    // For example, using Alpha Vantage, Yahoo Finance, or other providers
+    const price = await fetchMarketPrice(symbol);
+    res.json({ price });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch market data' });
+  }
+});
+
+
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";

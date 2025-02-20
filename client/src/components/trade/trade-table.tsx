@@ -136,9 +136,8 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
               <TableHead className="text-right">Strike</TableHead>
               <TableHead className="text-right">Quantity</TableHead>
               <TableHead className="text-right">Cost Basis</TableHead>
-              <TableHead className="text-right">P/L ($)</TableHead>
-              <TableHead className="text-right">P/L (%)</TableHead>
-              <TableHead className="text-right">Unrealized P/L</TableHead>
+              <TableHead className="text-right">{showClosed ? "P/L ($)" : "Unrealized P/L ($)"}</TableHead>
+              <TableHead className="text-right">{showClosed ? "P/L (%)" : "Unrealized P/L (%)"}</TableHead>
               <TableHead className="text-right">Days</TableHead>
               <TableHead>Status</TableHead>
               {!readOnly && <TableHead className="text-right">Actions</TableHead>}

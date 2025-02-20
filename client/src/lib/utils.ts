@@ -6,18 +6,34 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 
-function calculateUnrealizedPL(trade: Trade) {
+async function fetchCurrentPrice(symbol: string) {
+  try {
+    const response = await fetch(`/api/market-data/${symbol}`);
+    if (!response.ok) throw new Error('Failed to fetch price');
+    const data = await response.json();
+    return data.price;
+  } catch (error) {
+    console.error('Error fetching price:', error);
+    return null;
+  }
+}
+
+async function calculateUnrealizedPL(trade: Trade) {
   const premium = parseFloat(trade.premium?.toString() || '0');
   const quantity = trade.quantity;
   const strikePrice = parseFloat(trade.strikePrice?.toString() || '0');
-  const currentPrice = trade.currentPrice || strikePrice; // This would need to be fetched from market data
+  
+  const currentPrice = await fetchCurrentPrice(trade.underlyingAsset);
+  if (!currentPrice) return '-';
 
   if (trade.optionType?.includes('long')) {
-    // Long options
-    return ((currentPrice - premium) * quantity * 100).toFixed(2);
+    const pl = ((currentPrice - premium) * quantity * 100);
+    const plPercent = ((currentPrice - premium) / premium * 100);
+    return { amount: pl.toFixed(2), percentage: plPercent.toFixed(2) };
   } else if (trade.optionType?.includes('covered') || trade.optionType?.includes('secured')) {
-    // Short options
-    return ((premium - currentPrice) * quantity * 100).toFixed(2);
+    const pl = ((premium - currentPrice) * quantity * 100);
+    const plPercent = ((premium - currentPrice) / premium * 100);
+    return { amount: pl.toFixed(2), percentage: plPercent.toFixed(2) };
   }
-  return '-';
+  return { amount: '-', percentage: '-' };
 }
