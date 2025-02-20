@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Trade } from "@shared/schema"
 
@@ -6,14 +7,14 @@ interface MetricsCardProps {
 }
 
 function calculateSharpeRatio(trades: Trade[]): number {
-  const closedTrades = trades.filter(t => t.closeDate && t.profitLoss);
+  const closedTrades = trades.filter(t => t.status === 'closed' && t.profitLoss && t.capitalUsed);
   if (closedTrades.length === 0) return 0;
 
-  // Calculate daily returns
+  // Calculate returns as percentages
   const returns = closedTrades.map(trade => {
     const pl = Number(trade.profitLoss);
     const capital = Number(trade.capitalUsed);
-    return (pl / capital) * 100; // Return as percentage
+    return (pl / capital) * 100;
   });
 
   // Calculate average return
@@ -26,12 +27,12 @@ function calculateSharpeRatio(trades: Trade[]): number {
   // Assume risk-free rate of 4.5% annually, or about 0.0123% daily
   const riskFreeRate = 0.0123;
 
-  // Calculate annualized Sharpe ratio (multiply by sqrt(252) for annualization)
+  // Calculate annualized Sharpe ratio
   return stdDev !== 0 ? ((avgReturn - riskFreeRate) / stdDev) * Math.sqrt(252) : 0;
 }
 
 function calculateProfitFactor(trades: Trade[]): number {
-  const closedTrades = trades.filter(t => t.closeDate && t.profitLoss);
+  const closedTrades = trades.filter(t => t.status === 'closed' && t.profitLoss);
   if (closedTrades.length === 0) return 0;
 
   const { grossProfit, grossLoss } = closedTrades.reduce(
@@ -51,13 +52,18 @@ function calculateProfitFactor(trades: Trade[]): number {
 }
 
 export function MetricsCard({ trades }: MetricsCardProps) {
-  const avgHoldingTime = trades?.reduce((sum, t) => {
-    if (!t.closeDate) return sum;
+  const closedTrades = trades.filter(t => t.status === 'closed');
+  
+  const avgHoldingTime = closedTrades.reduce((sum, t) => {
+    if (!t.closeDate || !t.tradeDate) return sum;
     return sum + (new Date(t.closeDate).getTime() - new Date(t.tradeDate).getTime());
-  }, 0) / (trades?.filter(t => t.closeDate).length || 1);
+  }, 0) / (closedTrades.length || 1);
 
   const sharpeRatio = calculateSharpeRatio(trades);
   const profitFactor = calculateProfitFactor(trades);
+
+  const winCount = closedTrades.filter(t => Number(t.profitLoss) > 0).length;
+  const winLossRatio = closedTrades.length > 0 ? winCount / closedTrades.length : 0;
 
   return (
     <Card>
@@ -72,10 +78,7 @@ export function MetricsCard({ trades }: MetricsCardProps) {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Win/Loss Ratio</span>
-            <span className="font-mono">
-              {((trades?.filter(t => Number(t.profitLoss) > 0).length || 0) / 
-                (trades?.filter(t => t.closeDate).length || 1)).toFixed(2)}
-            </span>
+            <span className="font-mono">{winLossRatio.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Sharpe Ratio</span>

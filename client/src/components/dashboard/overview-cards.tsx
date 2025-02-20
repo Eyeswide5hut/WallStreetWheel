@@ -1,6 +1,7 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trade, debitOptionTypes, creditOptionTypes } from "@shared/schema";
+import { Trade } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 
 export function OverviewCards() {
@@ -23,29 +24,21 @@ export function OverviewCards() {
     );
   }
 
-  const totalTrades = trades?.length || 0;
-
-  // Calculate profitable trades based on closed P&L
-  const profitableTrades = trades?.filter(t => {
-    if (!t.closeDate) return false;
+  const closedTrades = trades?.filter(t => t.status === 'closed') || [];
+  const openTrades = trades?.filter(t => t.status === 'open') || [];
+  
+  // Calculate win rate from closed trades only
+  const profitableTrades = closedTrades.filter(t => {
     const profitLoss = Number(t.profitLoss || 0);
     return profitLoss > 0;
-  }).length || 0;
+  }).length;
 
-  const winRate = totalTrades ? (profitableTrades / totalTrades * 100).toFixed(1) : "0";
+  const winRate = closedTrades.length ? (profitableTrades / closedTrades.length * 100).toFixed(1) : "0";
 
   // Total P/L is the sum of realized profits/losses from closed trades
-  const totalPnL = trades?.reduce((sum, t) => {
-    if (!t.closeDate) return sum;
+  const totalPnL = closedTrades.reduce((sum, t) => {
     return sum + Number(t.profitLoss || 0);
-  }, 0) || 0;
-
-  const tradingStats = {
-    totalPnL,
-    totalTrades,
-    winRate,
-    profitableTrades
-  };
+  }, 0);
 
   return (
     <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
@@ -54,7 +47,7 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Total Trades</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{totalTrades}</div>
+          <div className="text-2xl font-bold">{closedTrades.length}</div>
         </CardContent>
       </Card>
 
@@ -84,7 +77,7 @@ export function OverviewCards() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {trades?.filter(t => new Date(t.expirationDate) > new Date()).length || 0}
+            {openTrades.length}
           </div>
         </CardContent>
       </Card>
