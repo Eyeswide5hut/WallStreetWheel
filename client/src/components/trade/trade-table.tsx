@@ -206,14 +206,14 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
                     {trade.status}
                   </Badge>
                 </TableCell>
-                {!readOnly && trade.status === 'open' && (
+                {!readOnly && (
                   <TableCell className="text-right">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={(e) => handleCloseTrade(trade, e)}
+                      onClick={(e) => handleRowClick(trade)}
                     >
-                      Close
+                      {trade.status === 'open' ? 'Close' : 'Edit'}
                     </Button>
                   </TableCell>
                 )}
