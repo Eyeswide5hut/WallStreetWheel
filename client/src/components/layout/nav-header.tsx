@@ -46,6 +46,14 @@ export function NavHeader() {
                         </div>
                       </div>
                     </Link>
+                  </div>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+
+              <NavigationMenuItem>
+                <NavigationMenuTrigger>Community</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <div className="grid gap-3 p-4 w-[400px]">
                     <Link href="/latest-trades" className="block">
                       <div className="flex items-center gap-2 p-2 hover:bg-accent rounded-md">
                         <Users className="h-5 w-5" />
@@ -55,14 +63,6 @@ export function NavHeader() {
                         </div>
                       </div>
                     </Link>
-                  </div>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-
-              <NavigationMenuItem>
-                <NavigationMenuTrigger>Community</NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <div className="grid gap-3 p-4 w-[400px]">
                     <Link href="/leaderboard" className="block">
                       <div className="flex items-center gap-2 p-2 hover:bg-accent rounded-md">
                         <Users className="h-5 w-5" />
