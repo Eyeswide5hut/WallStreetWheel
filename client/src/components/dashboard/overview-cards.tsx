@@ -59,8 +59,21 @@ export function OverviewCards() {
     return sum;
   }, 0) / (totalTrades || 1);
 
+  // Calculate Sharpe ratio
+  const returns = closedTrades.map(trade => {
+    const pl = Number(trade.profitLoss || 0);
+    const capital = Number(trade.capitalUsed || 0);
+    return capital > 0 ? (pl / capital) * 100 : 0;
+  });
+
+  const avgDailyReturn = returns.reduce((a, b) => a + b, 0) / (returns.length || 1);
+  const variance = returns.reduce((acc, ret) => acc + Math.pow(ret - avgDailyReturn, 2), 0) / (returns.length || 1);
+  const stdDev = Math.sqrt(variance);
+  const riskFreeRate = 0.0123; // Assume 4.5% annual risk-free rate
+  const sharpeRatio = stdDev !== 0 ? ((avgDailyReturn - riskFreeRate) / stdDev) * Math.sqrt(252) : 0;
+
   return (
-    <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+    <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Trades</CardTitle>
@@ -94,6 +107,15 @@ export function OverviewCards() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{avgReturn.toFixed(1)}%</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Sharpe Ratio</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{sharpeRatio.toFixed(2)}</div>
         </CardContent>
       </Card>
     </div>
