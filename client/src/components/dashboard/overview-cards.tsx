@@ -26,33 +26,38 @@ export function OverviewCards() {
 
   const closedTrades = trades?.filter(t => t.status === 'closed') || [];
   
+  // Calculate total trades
+  const totalTrades = closedTrades.length;
+
   // Calculate win rate
   const profitableTrades = closedTrades.filter(t => {
     const profitLoss = Number(t.profitLoss || 0);
     return profitLoss > 0;
   });
-  const winRate = closedTrades.length > 0 ? (profitableTrades.length / closedTrades.length * 100) : 0;
-
-  // Calculate total P/L
-  const totalPnL = closedTrades.reduce((sum, t) => sum + Number(t.profitLoss || 0), 0);
+  const winRate = totalTrades > 0 ? (profitableTrades.length / totalTrades * 100) : 0;
 
   // Calculate profit factor
-  const { gains, losses } = closedTrades.reduce((acc, trade) => {
+  const { totalGains, totalLosses } = closedTrades.reduce((acc, trade) => {
     const pl = Number(trade.profitLoss || 0);
-    if (pl > 0) acc.gains += pl;
-    else acc.losses += Math.abs(pl);
+    if (pl > 0) {
+      acc.totalGains += pl;
+    } else {
+      acc.totalLosses += Math.abs(pl);
+    }
     return acc;
-  }, { gains: 0, losses: 0 });
-  const profitFactor = losses > 0 ? gains / losses : gains > 0 ? Infinity : 0;
+  }, { totalGains: 0, totalLosses: 0 });
 
-  // Calculate average return
-  const avgReturn = closedTrades.length > 0 
-    ? closedTrades.reduce((sum, t) => {
-        const pl = Number(t.profitLoss || 0);
-        const capital = Number(t.capitalUsed || 1);
-        return sum + (pl / capital * 100);
-      }, 0) / closedTrades.length
-    : 0;
+  const profitFactor = totalLosses > 0 ? totalGains / totalLosses : totalGains > 0 ? Infinity : 0;
+
+  // Calculate average return per trade
+  const avgReturn = closedTrades.reduce((sum, trade) => {
+    const pl = Number(trade.profitLoss || 0);
+    const capital = Number(trade.capitalUsed || 0);
+    if (capital > 0) {
+      return sum + ((pl / capital) * 100);
+    }
+    return sum;
+  }, 0) / (totalTrades || 1);
 
   return (
     <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
@@ -61,7 +66,7 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Total Trades</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">156</div>
+          <div className="text-2xl font-bold">{totalTrades}</div>
         </CardContent>
       </Card>
 
@@ -70,7 +75,7 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">68%</div>
+          <div className="text-2xl font-bold">{winRate.toFixed(1)}%</div>
         </CardContent>
       </Card>
 
@@ -79,7 +84,7 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Profit Factor</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">2.1</div>
+          <div className="text-2xl font-bold">{profitFactor === Infinity ? '∞' : profitFactor.toFixed(2)}</div>
         </CardContent>
       </Card>
 
@@ -88,7 +93,7 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Avg Return</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">12.4%</div>
+          <div className="text-2xl font-bold">{avgReturn.toFixed(1)}%</div>
         </CardContent>
       </Card>
     </div>
