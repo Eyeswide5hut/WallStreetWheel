@@ -400,6 +400,21 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/trades/latest", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const trades = await storage.getAllTradesWithUserInfo();
+      const sortedTrades = trades.sort((a, b) => 
+        new Date(b.tradeDate).getTime() - new Date(a.tradeDate).getTime()
+      );
+      res.json(sortedTrades.slice(0, 50)); // Return last 50 trades
+    } catch (error) {
+      console.error('Get latest trades error:', error);
+      res.status(500).json({ error: "Failed to get latest trades" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

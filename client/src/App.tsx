@@ -15,6 +15,7 @@ import EducationPage from "./pages/education-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import './index.css'
 import { ThemeProvider } from "@/components/theme-provider"
+import LatestTradesPage from "./pages/latest-trades";
 
 function Router() {
   return (
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       <Route path="/positions" component={PositionPage} />
       <Route path="/education" component={EducationPage} />
+      <Route path="/latest-trades" component={LatestTradesPage} />
       <Route component={NotFound} />
     </Switch>
   );
