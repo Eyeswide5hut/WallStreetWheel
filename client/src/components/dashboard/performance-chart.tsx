@@ -160,8 +160,20 @@ export function PerformanceChart() {
               {chartData.some(d => d.iron_condor !== 0) && (
                 <Line type="monotone" dataKey="iron_condor" name="Iron Condors" stroke="#ffc658" />
               )}
-              {chartData.some(d => d.other !== 0) && (
-                <Line type="monotone" dataKey="other" name="Other" stroke="#ff7300" />
+              {chartData.some(d => d.call_spread !== 0) && (
+                <Line type="monotone" dataKey="call_spread" name="Call Spreads" stroke="#ff7300" />
+              )}
+              {chartData.some(d => d.put_spread !== 0) && (
+                <Line type="monotone" dataKey="put_spread" name="Put Spreads" stroke="#e91e63" />
+              )}
+              {chartData.some(d => d.butterfly !== 0) && (
+                <Line type="monotone" dataKey="butterfly" name="Butterfly" stroke="#9c27b0" />
+              )}
+              {chartData.some(d => d.straddle !== 0) && (
+                <Line type="monotone" dataKey="straddle" name="Straddle" stroke="#673ab7" />
+              )}
+              {chartData.some(d => d.strangle !== 0) && (
+                <Line type="monotone" dataKey="strangle" name="Strangle" stroke="#3f51b5" />
               )}
             </>
           )}
@@ -200,8 +212,20 @@ export function PerformanceChart() {
             {chartData.some(d => d.iron_condor !== 0) && (
               <Bar dataKey="iron_condor" name="Iron Condors" fill="#ffc658" stackId="a" />
             )}
-            {chartData.some(d => d.other !== 0) && (
-              <Bar dataKey="other" name="Other" fill="#ff7300" stackId="a" />
+            {chartData.some(d => d.call_spread !== 0) && (
+              <Bar dataKey="call_spread" name="Call Spreads" fill="#ff7300" stackId="a" />
+            )}
+            {chartData.some(d => d.put_spread !== 0) && (
+              <Bar dataKey="put_spread" name="Put Spreads" fill="#e91e63" stackId="a" />
+            )}
+            {chartData.some(d => d.butterfly !== 0) && (
+              <Bar dataKey="butterfly" name="Butterfly" fill="#9c27b0" stackId="a" />
+            )}
+            {chartData.some(d => d.straddle !== 0) && (
+              <Bar dataKey="straddle" name="Straddle" fill="#673ab7" stackId="a" />
+            )}
+            {chartData.some(d => d.strangle !== 0) && (
+              <Bar dataKey="strangle" name="Strangle" fill="#3f51b5" stackId="a" />
             )}
           </>
         )}
