@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { format, startOfWeek, getWeek } from "date-fns";
 
 type TimeFrame = 'weekly' | 'monthly' | 'yearly';
 type ChartType = 'line' | 'bar';
@@ -46,25 +47,30 @@ const aggregateTradesByPeriod = (trades: Trade[], timeFrame: TimeFrame) => {
   sorted.forEach(trade => {
     const date = new Date(trade.tradeDate);
     let periodKey: string;
+    let displayPeriod: string;
 
     switch (timeFrame) {
-      case 'weekly':
-        // Get Monday of the week
-        const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-        periodKey = new Date(date.setDate(diff)).toISOString().split('T')[0];
+      case 'weekly': {
+        const startOfWeekDate = startOfWeek(date, { weekStartsOn: 1 });
+        periodKey = format(startOfWeekDate, 'yyyy-MM-dd');
+        displayPeriod = `Week ${getWeek(date)}`;
         break;
-      case 'monthly':
-        periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      }
+      case 'monthly': {
+        periodKey = format(date, 'yyyy-MM');
+        displayPeriod = format(date, 'MMM yyyy');
         break;
-      case 'yearly':
-        periodKey = date.getFullYear().toString();
+      }
+      case 'yearly': {
+        periodKey = format(date, 'yyyy');
+        displayPeriod = periodKey;
         break;
+      }
     }
 
     if (!periods.has(periodKey)) {
       periods.set(periodKey, {
-        period: periodKey,
+        period: displayPeriod,
         totalPnL: 0,
         covered_call: 0,
         naked_put: 0,
@@ -82,8 +88,8 @@ const aggregateTradesByPeriod = (trades: Trade[], timeFrame: TimeFrame) => {
     period.totalPnL += pnl;
 
     // Aggregate by strategy
-    if (trade.tradeType === 'option' && trade.optionStrategy) {
-      switch (trade.optionStrategy) {
+    if (trade.tradeType === 'option' && trade.strategy) {
+      switch (trade.strategy) {
         case 'covered_call':
           period.covered_call += pnl;
           break;
@@ -120,9 +126,22 @@ export function PerformanceChart() {
   const [chartType, setChartType] = useState<ChartType>('line');
   const [viewMode, setViewMode] = useState<'pnl' | 'strategy'>('pnl');
 
-  const { data: trades } = useQuery<Trade[]>({
+  const { data: trades, isLoading } = useQuery<Trade[]>({
     queryKey: ["/api/trades"],
   });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Performance Over Time</CardTitle>
+        </CardHeader>
+        <CardContent className="h-[350px] flex items-center justify-center">
+          <p className="text-muted-foreground">Loading chart data...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!trades?.length) {
     return (
@@ -139,15 +158,22 @@ export function PerformanceChart() {
 
   const chartData = aggregateTradesByPeriod(trades, timeFrame);
 
+  const formatTooltipValue = (value: number) => {
+    return `$${value.toFixed(2)}`;
+  };
+
   const renderChart = () => {
     if (chartType === 'line') {
       return (
-        <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
           <XAxis
             dataKey="period"
             stroke="#888888"
             fontSize={12}
             tickLine={false}
+            angle={-45}
+            textAnchor="end"
+            height={60}
           />
           <YAxis
             stroke="#888888"
@@ -156,7 +182,7 @@ export function PerformanceChart() {
             tickFormatter={(value) => `$${value}`}
           />
           <Tooltip
-            formatter={(value: number) => [`$${value.toFixed(2)}`, 'P/L']}
+            formatter={(value: number) => [formatTooltipValue(value), 'P/L']}
           />
           <Legend />
           {viewMode === 'pnl' ? (
@@ -201,12 +227,15 @@ export function PerformanceChart() {
     }
 
     return (
-      <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+      <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
         <XAxis
           dataKey="period"
           stroke="#888888"
           fontSize={12}
           tickLine={false}
+          angle={-45}
+          textAnchor="end"
+          height={60}
         />
         <YAxis
           stroke="#888888"
@@ -215,7 +244,7 @@ export function PerformanceChart() {
           tickFormatter={(value) => `$${value}`}
         />
         <Tooltip
-          formatter={(value: number) => [`$${value.toFixed(2)}`, 'P/L']}
+          formatter={(value: number) => [formatTooltipValue(value), 'P/L']}
         />
         <Legend />
         {viewMode === 'pnl' ? (
