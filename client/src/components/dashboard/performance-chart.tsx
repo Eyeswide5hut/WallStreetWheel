@@ -36,7 +36,11 @@ const aggregateTradesByPeriod = (trades: Trade[], timeFrame: TimeFrame) => {
     covered_call: number;
     naked_put: number;
     iron_condor: number;
-    other: number;
+    call_spread: number;
+    put_spread: number;
+    butterfly: number;
+    straddle: number;
+    strangle: number;
   }>();
 
   sorted.forEach(trade => {
@@ -65,7 +69,11 @@ const aggregateTradesByPeriod = (trades: Trade[], timeFrame: TimeFrame) => {
         covered_call: 0,
         naked_put: 0,
         iron_condor: 0,
-        other: 0
+        call_spread: 0,
+        put_spread: 0,
+        butterfly: 0,
+        straddle: 0,
+        strangle: 0
       });
     }
 
@@ -74,7 +82,7 @@ const aggregateTradesByPeriod = (trades: Trade[], timeFrame: TimeFrame) => {
     period.totalPnL += pnl;
 
     // Aggregate by strategy
-    if (trade.tradeType === 'option') {
+    if (trade.tradeType === 'option' && trade.optionStrategy) {
       switch (trade.optionStrategy) {
         case 'covered_call':
           period.covered_call += pnl;
@@ -85,11 +93,22 @@ const aggregateTradesByPeriod = (trades: Trade[], timeFrame: TimeFrame) => {
         case 'iron_condor':
           period.iron_condor += pnl;
           break;
-        default:
-          period.other += pnl;
+        case 'call_spread':
+          period.call_spread += pnl;
+          break;
+        case 'put_spread':
+          period.put_spread += pnl;
+          break;
+        case 'butterfly':
+          period.butterfly += pnl;
+          break;
+        case 'straddle':
+          period.straddle += pnl;
+          break;
+        case 'strangle':
+          period.strangle += pnl;
+          break;
       }
-    } else {
-      period.other += pnl;
     }
   });
 
