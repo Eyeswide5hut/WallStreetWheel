@@ -40,8 +40,8 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
 
   const trades = initialTrades || fetchedTrades;
   const filteredTrades = showClosed 
-    ? trades?.filter(t => t.closeDate)
-    : trades?.filter(t => !t.closeDate);
+    ? trades?.filter(t => t.status === 'closed')
+    : trades?.filter(t => t.status === 'open');
 
   const formatCurrency = (value: string | number | null | undefined) => {
     if (value === null || value === undefined) return "-";
@@ -204,7 +204,7 @@ export function TradeTable({ initialTrades, readOnly = false, showClosed = false
                     {trade.status}
                   </Badge>
                 </TableCell>
-                {!readOnly && !trade.closeDate && (
+                {!readOnly && trade.status === 'open' && (
                   <TableCell className="text-right">
                     <Button
                       variant="outline"
