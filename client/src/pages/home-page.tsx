@@ -30,42 +30,14 @@ export default function HomePage() {
               </TabsList>
 
               <TabsContent value="performance" className="space-y-4">
-                <div className="grid lg:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Portfolio Performance</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <PerformanceChart />
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Statistics</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <p className="text-sm text-muted-foreground">Win Rate</p>
-                          <p className="text-2xl font-bold">68%</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-sm text-muted-foreground">Profit Factor</p>
-                          <p className="text-2xl font-bold">2.1</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-sm text-muted-foreground">Total Trades</p>
-                          <p className="text-2xl font-bold">156</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-sm text-muted-foreground">Avg Return</p>
-                          <p className="text-2xl font-bold">12.4%</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Portfolio Performance</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <PerformanceChart />
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="positions">
