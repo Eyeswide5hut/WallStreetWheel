@@ -25,20 +25,34 @@ export function OverviewCards() {
   }
 
   const closedTrades = trades?.filter(t => t.status === 'closed') || [];
-  const openTrades = trades?.filter(t => t.status === 'open') || [];
   
-  // Calculate win rate from closed trades only
+  // Calculate win rate
   const profitableTrades = closedTrades.filter(t => {
     const profitLoss = Number(t.profitLoss || 0);
     return profitLoss > 0;
-  }).length;
+  });
+  const winRate = closedTrades.length > 0 ? (profitableTrades.length / closedTrades.length * 100) : 0;
 
-  const winRate = closedTrades.length ? (profitableTrades / closedTrades.length * 100).toFixed(1) : "0";
+  // Calculate total P/L
+  const totalPnL = closedTrades.reduce((sum, t) => sum + Number(t.profitLoss || 0), 0);
 
-  // Total P/L is the sum of realized profits/losses from closed trades
-  const totalPnL = closedTrades.reduce((sum, t) => {
-    return sum + Number(t.profitLoss || 0);
-  }, 0);
+  // Calculate profit factor
+  const { gains, losses } = closedTrades.reduce((acc, trade) => {
+    const pl = Number(trade.profitLoss || 0);
+    if (pl > 0) acc.gains += pl;
+    else acc.losses += Math.abs(pl);
+    return acc;
+  }, { gains: 0, losses: 0 });
+  const profitFactor = losses > 0 ? gains / losses : gains > 0 ? Infinity : 0;
+
+  // Calculate average return
+  const avgReturn = closedTrades.length > 0 
+    ? closedTrades.reduce((sum, t) => {
+        const pl = Number(t.profitLoss || 0);
+        const capital = Number(t.capitalUsed || 1);
+        return sum + (pl / capital * 100);
+      }, 0) / closedTrades.length
+    : 0;
 
   return (
     <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
@@ -56,29 +70,25 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{winRate}%</div>
+          <div className="text-2xl font-bold">{winRate.toFixed(1)}%</div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total P/L</CardTitle>
+          <CardTitle className="text-sm font-medium">Profit Factor</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className={`text-2xl font-bold ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            ${totalPnL.toFixed(2)}
-          </div>
+          <div className="text-2xl font-bold">{profitFactor === Infinity ? '∞' : profitFactor.toFixed(2)}</div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Active Trades</CardTitle>
+          <CardTitle className="text-sm font-medium">Avg Return</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
-            {openTrades.length}
-          </div>
+          <div className="text-2xl font-bold">{avgReturn.toFixed(1)}%</div>
         </CardContent>
       </Card>
     </div>
