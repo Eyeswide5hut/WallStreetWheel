@@ -121,17 +121,17 @@ export function TradeDialog({ trade, isOpen, onClose, readOnly }: TradeDialogPro
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[400px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             Edit Trade - {trade.underlyingAsset} {isOption ? trade.optionType : 'Stock'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="py-4">
+        <div className="py-2">
           <Form {...form}>
             <form onSubmit={form.handleSubmit((data) => updateTradeMutation.mutate(data))} 
-                  className="space-y-4">
+                  className="space-y-2">
               <FormField
                 control={form.control}
                 name="entryPrice"
