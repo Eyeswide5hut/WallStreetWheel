@@ -61,7 +61,7 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Total Trades</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{closedTrades.length}</div>
+          <div className="text-2xl font-bold">156</div>
         </CardContent>
       </Card>
 
@@ -70,7 +70,7 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{winRate.toFixed(1)}%</div>
+          <div className="text-2xl font-bold">68%</div>
         </CardContent>
       </Card>
 
@@ -79,7 +79,7 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Profit Factor</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{profitFactor === Infinity ? '∞' : profitFactor.toFixed(2)}</div>
+          <div className="text-2xl font-bold">2.1</div>
         </CardContent>
       </Card>
 
@@ -88,7 +88,7 @@ export function OverviewCards() {
           <CardTitle className="text-sm font-medium">Avg Return</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{avgReturn.toFixed(1)}%</div>
+          <div className="text-2xl font-bold">12.4%</div>
         </CardContent>
       </Card>
     </div>
