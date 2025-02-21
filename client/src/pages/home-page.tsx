@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { OverviewCards } from "@/components/dashboard/overview-cards";
 import { PerformanceChart } from "@/components/dashboard/performance-chart";
 import { TradeTable } from "@/components/trade/trade-table";
+import { TradeImporter } from "@/components/trade/trade-importer";
 import { NavHeader } from "@/components/layout/nav-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +19,11 @@ export default function HomePage() {
           <section>
             <h2 className="text-3xl font-bold tracking-tight mb-6">Trading Dashboard</h2>
             <OverviewCards />
+          </section>
+
+          {/* Trade Importer */}
+          <section>
+            <TradeImporter />
           </section>
 
           {/* Main Content */}

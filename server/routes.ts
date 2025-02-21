@@ -405,7 +405,7 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const trades = await storage.getAllTradesWithUserInfo();
-      const sortedTrades = trades.sort((a, b) => 
+      const sortedTrades = trades.sort((a, b) =>
         new Date(b.tradeDate).getTime() - new Date(a.tradeDate).getTime()
       );
       res.json(sortedTrades.slice(0, 50)); // Return last 50 trades
@@ -415,6 +415,100 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/trades/import", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const trades = await processImportedTrades(req.body);
+      for (const trade of trades) {
+        await storage.createTrade(req.user!.id, trade);
+      }
+      res.status(201).json({ message: "Trades imported successfully" });
+    } catch (error) {
+      console.error('Trade import error:', error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to import trades" });
+    }
+  });
+
+  async function processImportedTrades(data: any[]): Promise<InsertTrade[]> {
+    const trades: InsertTrade[] = [];
+
+    for (const row of data) {
+      // Skip non-trade rows
+      if (!row.Type || !row.Symbol || !row['Trade Date']) continue;
+
+      const tradeDate = new Date(row['Trade Date']);
+      const quantity = Math.abs(parseInt(row.Quantity));
+      const premium = Math.abs(parseFloat(row.Premium));
+
+      // Parse option details if it's an options trade
+      const optionMatch = row.Symbol.match(/([A-Z]+)(\d{6}[CP])(\d+)/);
+
+      if (optionMatch) {
+        // It's an options trade
+        const [_, underlying, dateStrike, strikePrice] = optionMatch;
+        const optionType = dateStrike.endsWith('C') ? 'long_call' : 'long_put';
+        const expirationDate = new Date(
+          `20${dateStrike.slice(0, 2)}-${dateStrike.slice(2, 4)}-${dateStrike.slice(4, 6)}`
+        );
+
+        trades.push({
+          tradeType: 'option',
+          underlyingAsset: underlying,
+          optionType,
+          strikePrice: parseFloat(strikePrice) / 1000, // Convert strike price to decimal
+          premium,
+          quantity,
+          platform: 'tastytrade',
+          tradeDate,
+          expirationDate,
+          useMargin: false,
+          status: 'open',
+          notes: `Imported from TastyTrade - ${row.Type}`,
+          tags: ['imported'],
+        });
+      } else {
+        // It's a stock trade
+        trades.push({
+          tradeType: 'stock',
+          underlyingAsset: row.Symbol,
+          quantity,
+          entryPrice: parseFloat(row.Price),
+          platform: 'tastytrade',
+          tradeDate,
+          useMargin: false,
+          status: 'open',
+          notes: `Imported from TastyTrade - ${row.Type}`,
+          tags: ['imported'],
+        });
+      }
+    }
+
+    return trades;
+  }
+
   const httpServer = createServer(app);
   return httpServer;
+}
+
+interface InsertTrade {
+  tradeType: 'stock' | 'option';
+  underlyingAsset: string;
+  quantity: number;
+  entryPrice?: number;
+  optionType?: 'long_call' | 'long_put';
+  strikePrice?: number;
+  premium?: number;
+  platform: string;
+  tradeDate: Date;
+  expirationDate?: Date;
+  useMargin: boolean;
+  status: 'open' | 'closed';
+  notes?: string;
+  tags?: string[];
+}
+
+async function fetchMarketPrice(symbol: string): Promise<number> {
+  // Replace with your actual market data fetching logic
+  return 0;
 }
