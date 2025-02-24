@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Loader2, LineChart, Settings, Users, BookOpen, BarChart2 } from "lucide-react";
+import { Loader2, LineChart, Settings, Users, BookOpen, BarChart2, Search } from "lucide-react";
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -43,6 +43,15 @@ export function NavHeader() {
                         <div>
                           <h3 className="font-medium">Positions</h3>
                           <p className="text-sm text-muted-foreground">View and manage open positions</p>
+                        </div>
+                      </div>
+                    </Link>
+                    <Link href="/scanner" className="block">
+                      <div className="flex items-center gap-2 p-2 hover:bg-accent rounded-md">
+                        <Search className="h-5 w-5" />
+                        <div>
+                          <h3 className="font-medium">Options Scanner</h3>
+                          <p className="text-sm text-muted-foreground">Search and analyze options contracts</p>
                         </div>
                       </div>
                     </Link>
