@@ -201,7 +201,25 @@ export const scannerConfigs = pgTable("scanner_configs", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Add visibility types
+// Add after the existing tables, before type exports
+export const optionScannerData = pgTable("option_scanner_data", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  strikePrice: decimal("strike_price").notNull(),
+  currentPrice: decimal("current_price").notNull(),
+  priceDifference: decimal("price_difference").notNull(),
+  premium: decimal("premium").notNull(),
+  impliedVolatility: decimal("implied_volatility").notNull(),
+  returnOnCapital: decimal("return_on_capital").notNull(),
+  annualReturn: decimal("annual_return").notNull(),
+  volume: integer("volume").notNull(),
+  expirationDate: timestamp("expiration_date").notNull(),
+  greeks: jsonb("greeks").notNull(),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
+// Add support for various visibility types
 export const visibilityTypes = ["public", "private", "followers"] as const;
 
 // Zod schemas for validation
@@ -398,6 +416,24 @@ export const insertScannerConfigSchema = createInsertSchema(scannerConfigs)
     }),
   });
 
+// Add before the existing type exports
+export const insertOptionScannerDataSchema = createInsertSchema(optionScannerData)
+  .omit({
+    id: true,
+    userId: true,
+    lastUpdated: true
+  })
+  .extend({
+    greeks: z.object({
+      delta: z.number(),
+      gamma: z.number(),
+      theta: z.number(),
+      vega: z.number(),
+      rho: z.number().optional()
+    }),
+    expirationDate: z.string().transform((val) => new Date(val))
+  });
+
 // Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -426,3 +462,6 @@ export type InsertTradeIdea = z.infer<typeof insertTradeIdeaSchema>;
 export type TradeIdea = typeof tradeIdeas.$inferSelect;
 export type ScannerConfig = typeof scannerConfigs.$inferSelect;
 export type InsertScannerConfig = z.infer<typeof insertScannerConfigSchema>;
+// Add to type exports section
+export type OptionScannerData = typeof optionScannerData.$inferSelect;
+export type InsertOptionScannerData = z.infer<typeof insertOptionScannerDataSchema>;
