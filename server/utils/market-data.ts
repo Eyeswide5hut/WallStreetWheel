@@ -5,11 +5,18 @@ const POLYGON_BASE_URL = 'https://api.polygon.io/v3';
 export async function fetchOptionsData(symbol: string): Promise<InsertOptionScannerData[]> {
   try {
     // First get the current stock price
-    const stockResponse = await fetch(
-      `${POLYGON_BASE_URL}/snapshot/ticker/${symbol}/trades?apiKey=${process.env.POLYGON_API_KEY}`
-    );
+    const stockUrl = `${POLYGON_BASE_URL}/snapshot/ticker/${symbol}/trades?apiKey=${process.env.POLYGON_API_KEY}`;
+    console.log('Fetching stock price from:', stockUrl);
+
+    const stockResponse = await fetch(stockUrl);
 
     if (!stockResponse.ok) {
+      const errorText = await stockResponse.text();
+      console.error('Stock price API error:', {
+        status: stockResponse.status,
+        statusText: stockResponse.statusText,
+        response: errorText
+      });
       throw new Error(`Stock price API error: ${stockResponse.statusText}`);
     }
 
@@ -18,11 +25,18 @@ export async function fetchOptionsData(symbol: string): Promise<InsertOptionScan
     const currentStockPrice = stockData.results?.last?.price || 0;
 
     // Then get options data
-    const optionsResponse = await fetch(
-      `${POLYGON_BASE_URL}/reference/options/contracts?underlying_ticker=${symbol}&expired=false&limit=100&apiKey=${process.env.POLYGON_API_KEY}`
-    );
+    const optionsUrl = `${POLYGON_BASE_URL}/reference/options/contracts?underlying_ticker=${symbol}&expired=false&limit=100&apiKey=${process.env.POLYGON_API_KEY}`;
+    console.log('Fetching options data from:', optionsUrl);
+
+    const optionsResponse = await fetch(optionsUrl);
 
     if (!optionsResponse.ok) {
+      const errorText = await optionsResponse.text();
+      console.error('Options API error:', {
+        status: optionsResponse.status,
+        statusText: optionsResponse.statusText,
+        response: errorText
+      });
       throw new Error(`Options API error: ${optionsResponse.statusText}`);
     }
 
@@ -30,22 +44,34 @@ export async function fetchOptionsData(symbol: string): Promise<InsertOptionScan
     console.log('Options API Response:', JSON.stringify(data, null, 2));
 
     if (!data.results || !Array.isArray(data.results)) {
-      console.log('Unexpected API response:', data);
+      console.error('Unexpected API response structure:', {
+        hasResults: !!data.results,
+        isArray: Array.isArray(data.results),
+        data
+      });
       return [];
     }
 
-    return data.results.map((option: any) => {
+    // Filter out expired options and map the data
+    const now = new Date();
+    const validOptions = data.results.filter(option => 
+      new Date(option.expiration_date) > now
+    );
+
+    console.log(`Found ${validOptions.length} valid options for ${symbol}`);
+
+    return validOptions.map((option: any) => {
       const strikePrice = option.strike_price || 0;
       const daysToExpiry = Math.ceil(
-        (new Date(option.expiration_date).getTime() - new Date().getTime()) / 
+        (new Date(option.expiration_date).getTime() - now.getTime()) / 
         (1000 * 60 * 60 * 24)
       );
 
-      // Get the option type from contract name (e.g., "O:AAPL250117C00150000")
+      // Get the option type from contract name
       const isCall = option.contract_type === "call";
       const delta = isCall ? 0.5 : -0.5; // Default delta based on option type
 
-      return {
+      const mappedOption = {
         symbol: option.underlying_ticker || symbol,
         strikePrice: strikePrice.toString(),
         currentPrice: currentStockPrice.toString(),
@@ -66,6 +92,9 @@ export async function fetchOptionsData(symbol: string): Promise<InsertOptionScan
           rho: "0.010"
         }
       };
+
+      console.log(`Mapped option for ${symbol}:`, mappedOption);
+      return mappedOption;
     });
   } catch (error) {
     console.error('Error fetching options data:', error);
