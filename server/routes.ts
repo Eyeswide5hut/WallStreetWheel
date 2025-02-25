@@ -487,6 +487,48 @@ export function registerRoutes(app: Express): Server {
     return trades;
   }
 
+  // Add after existing route handlers
+  app.get("/api/options-scanner", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const symbols = (req.query.symbols as string || "").split(",").filter(Boolean);
+
+      if (symbols.length === 0) {
+        return res.json([]);
+      }
+
+      // For now, return mock data for testing
+      const mockData = symbols.flatMap(symbol => ([{
+        id: 1,
+        userId: req.user!.id,
+        symbol,
+        strikePrice: "18.00",
+        currentPrice: "18.08",
+        priceDifference: "-0.40",
+        premium: "1.84",
+        impliedVolatility: "219",
+        returnOnCapital: "10.22",
+        annualReturn: "641.33",
+        volume: 999,
+        expirationDate: new Date("2025-03-01"),
+        greeks: {
+          delta: 0.65,
+          gamma: 0.03,
+          theta: -0.04,
+          vega: 0.15,
+          rho: 0.02
+        },
+        lastUpdated: new Date()
+      }]));
+
+      res.json(mockData);
+    } catch (error) {
+      console.error('Options scanner error:', error);
+      res.status(500).json({ error: "Failed to fetch options data" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -11,6 +11,7 @@ import { type InsertTradeIdea, tradeIdeas, type TradeIdea, tradeIdeaComments, tr
 import { type InsertScannerConfig, scannerConfigs, type ScannerConfig } from "@shared/schema";
 import { type LeaderboardMetric } from "@shared/types";
 import { userFollows } from "@shared/schema";
+import { type OptionScannerData, type InsertOptionScannerData, optionScannerData } from "@shared/schema";
 
 
 const PostgresSessionStore = connectPg(session);
@@ -48,6 +49,8 @@ export interface IStorage {
   createScannerConfig(userId: number, config: InsertScannerConfig): Promise<ScannerConfig>;
   getScannerConfigs(userId: number): Promise<ScannerConfig[]>;
   getPublicScannerTemplates(): Promise<ScannerConfig[]>;
+  getOptionsData(symbols: string[]): Promise<OptionScannerData[]>;
+  createOptionsData(userId: number, data: InsertOptionScannerData): Promise<OptionScannerData>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -785,6 +788,25 @@ export class DatabaseStorage implements IStorage {
       .from(scannerConfigs)
       .where(sql`is_template = true AND is_public = true`)
       .orderBy(sql`${scannerConfigs.updatedAt} DESC`);
+  }
+  async getOptionsData(symbols: string[]): Promise<OptionScannerData[]> {
+    return db
+      .select()
+      .from(optionScannerData)
+      .where(sql`symbol = ANY(${symbols})`)
+      .orderBy(sql`expiration_date ASC`);
+  }
+
+  async createOptionsData(userId: number, data: InsertOptionScannerData): Promise<OptionScannerData> {
+    const [newData] = await db
+      .insert(optionScannerData)
+      .values({
+        userId,
+        ...data,
+      })
+      .returning();
+
+    return newData;
   }
 }
 
