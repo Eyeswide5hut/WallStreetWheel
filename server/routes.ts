@@ -5,6 +5,7 @@ import { insertTradeSchema, updateUserSchema, leaderboardMetricSchema, insertSha
 import { fromZodError } from "zod-validation-error";
 import { ZodError } from "zod";
 import { z } from "zod";
+import { fetchOptionsData } from "./utils/market-data";
 
 const closeTradeSchema = z.object({
   closePrice: z.number(),
@@ -492,40 +493,50 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      const symbols = (req.query.symbols as string || "").split(",").filter(Boolean);
+      const querySchema = z.object({
+        symbols: z.string(),
+        minDelta: z.string().optional(),
+        maxDelta: z.string().optional(),
+        minDaysToExpiry: z.string().optional(),
+        maxDaysToExpiry: z.string().optional(),
+        strategy: z.enum(['all', 'calls', 'puts']).optional()
+      });
 
-      if (symbols.length === 0) {
+      const { symbols, minDelta, maxDelta, minDaysToExpiry, maxDaysToExpiry, strategy } =
+        querySchema.parse(req.query);
+
+      const symbolList = symbols.split(",").filter(Boolean);
+      if (symbolList.length === 0) {
         return res.json([]);
       }
 
-      // For now, return mock data for testing
-      const mockData = symbols.flatMap(symbol => ([{
-        id: 1,
-        userId: req.user!.id,
-        symbol,
-        strikePrice: "18.00",
-        currentPrice: "18.08",
-        priceDifference: "-0.40",
-        premium: "1.84",
-        impliedVolatility: "219",
-        returnOnCapital: "10.22",
-        annualReturn: "641.33",
-        volume: 999,
-        expirationDate: new Date("2025-03-01"),
-        greeks: {
-          delta: 0.65,
-          gamma: 0.03,
-          theta: -0.04,
-          vega: 0.15,
-          rho: 0.02
-        },
-        lastUpdated: new Date()
-      }]));
+      let optionsData = [];
+      for (const symbol of symbolList) {
+        const data = await fetchOptionsData(symbol);
+        optionsData.push(...data);
+      }
 
-      res.json(mockData);
+      // Apply filters
+      const now = new Date();
+      optionsData = optionsData.filter(option => {
+        const daysToExpiry = Math.ceil((new Date(option.expirationDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        const delta = Math.abs(parseFloat(option.greeks.delta.toString()));
+
+        return (
+          (!minDelta || delta >= parseFloat(minDelta)) &&
+          (!maxDelta || delta <= parseFloat(maxDelta)) &&
+          (!minDaysToExpiry || daysToExpiry >= parseInt(minDaysToExpiry)) &&
+          (!maxDaysToExpiry || daysToExpiry <= parseInt(maxDaysToExpiry)) &&
+          (!strategy || strategy === 'all' ||
+            (strategy === 'calls' && delta > 0) ||
+            (strategy === 'puts' && delta < 0))
+        );
+      });
+
+      res.json(optionsData);
     } catch (error) {
       console.error('Options scanner error:', error);
-      res.status(500).json({ error: "Failed to fetch options data" });
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch options data" });
     }
   });
 
