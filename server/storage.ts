@@ -366,7 +366,7 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getTraderProfile(id: number): Promise<User | undefined> {
+  async getTraderProfile(id: number): Promise<(User & { trades: Trade[] }) | undefined> {
     try {
       if (!id || typeof id !== 'number') {
         console.error('Invalid trader ID:', id);
@@ -393,11 +393,28 @@ export class DatabaseStorage implements IStorage {
         .where(eq(users.id, id))
         .execute();
 
-      return trader;
+      if (!trader) return undefined;
+
+      const trades = await this.getUserTrades(id);
+      return { ...trader, trades };
     } catch (error) {
       console.error('Error retrieving trader profile:', error);
       return undefined;
     }
+  }
+
+  async getAllTradesWithUserInfo(): Promise<(Trade & { username: string })[]> {
+    const results = await db
+      .select({
+        ...trades,
+        username: users.username
+      })
+      .from(trades)
+      .innerJoin(users, eq(trades.userId, users.id))
+      .orderBy(sql`${trades.tradeDate} DESC`)
+      .limit(50);
+
+    return results;
   }
 
   async closeTrade(tradeId: number, closeData: {
