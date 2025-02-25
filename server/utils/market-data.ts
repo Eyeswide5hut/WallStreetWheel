@@ -13,26 +13,38 @@ export async function fetchOptionsData(symbol: string): Promise<InsertOptionScan
     }
 
     const data = await response.json();
-    
-    return data.results.map((contract: any) => ({
-      symbol: contract.underlying_ticker,
-      strikePrice: contract.strike_price.toString(),
-      currentPrice: contract.last_trade?.price?.toString() || "0",
-      priceDifference: ((contract.last_trade?.price - contract.strike_price) / contract.strike_price * 100).toString(),
-      premium: contract.last_trade?.price?.toString() || "0",
-      impliedVolatility: (contract.implied_volatility * 100).toString(),
-      returnOnCapital: ((contract.last_trade?.price / contract.strike_price) * 100).toString(),
-      annualReturn: "0", // Calculated based on days to expiration
-      volume: contract.day.volume || 0,
-      expirationDate: contract.expiration_date,
-      greeks: {
-        delta: contract.greeks?.delta || 0,
-        gamma: contract.greeks?.gamma || 0,
-        theta: contract.greeks?.theta || 0,
-        vega: contract.greeks?.vega || 0,
-        rho: contract.greeks?.rho || 0
-      }
-    }));
+
+    if (!data.results || !Array.isArray(data.results)) {
+      console.log('Unexpected API response:', data);
+      return [];
+    }
+
+    return data.results.map((contract: any) => {
+      // Ensure all required fields have default values
+      const lastPrice = contract.last_trade?.price || 0;
+      const strikePrice = contract.strike_price || 0;
+      const impliedVol = contract.implied_volatility || 0;
+
+      return {
+        symbol: contract.underlying_ticker,
+        strikePrice: strikePrice.toString(),
+        currentPrice: lastPrice.toString(),
+        priceDifference: (((lastPrice - strikePrice) / strikePrice) * 100).toString(),
+        premium: lastPrice.toString(),
+        impliedVolatility: (impliedVol * 100).toString(),
+        returnOnCapital: ((lastPrice / strikePrice) * 100).toString(),
+        annualReturn: "0", // Will calculate based on days to expiration
+        volume: contract.trading_volume || 0,
+        expirationDate: new Date(contract.expiration_date).toISOString(),
+        greeks: {
+          delta: contract.greeks?.delta || 0,
+          gamma: contract.greeks?.gamma || 0,
+          theta: contract.greeks?.theta || 0,
+          vega: contract.greeks?.vega || 0,
+          rho: contract.greeks?.rho || 0
+        }
+      };
+    });
   } catch (error) {
     console.error('Error fetching options data:', error);
     throw error;
