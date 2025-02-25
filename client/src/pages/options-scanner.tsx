@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import type { OptionScannerData } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 type Greeks = {
   delta: number;
@@ -30,16 +31,49 @@ type Greeks = {
 };
 
 export default function OptionsScannerPage() {
-  const [symbols, setSymbols] = useState<string>("");
+  const [symbolInput, setSymbolInput] = useState<string>("");
+  const [searchSymbols, setSearchSymbols] = useState<string>("");
+  const { toast } = useToast();
 
   const { data: optionsData, isLoading } = useQuery<OptionScannerData[]>({
-    queryKey: ['/api/options-scanner', symbols],
-    enabled: symbols.length > 0
+    queryKey: ['/api/options-scanner', searchSymbols],
+    queryFn: async () => {
+      if (!searchSymbols) return [];
+      const response = await fetch(`/api/options-scanner?symbols=${encodeURIComponent(searchSymbols)}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch options data');
+      }
+      return response.json();
+    },
+    enabled: !!searchSymbols,
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to fetch options data",
+        variant: "destructive",
+      });
+    }
   });
 
   const handleSearch = () => {
-    // This will trigger the query to refetch
-    setSymbols(symbols.trim());
+    if (!symbolInput.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter at least one symbol",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Format symbols: convert to uppercase, remove spaces, and split by commas
+    const formattedSymbols = symbolInput
+      .toUpperCase()
+      .split(",")
+      .map(s => s.trim())
+      .filter(Boolean)
+      .join(",");
+
+    setSearchSymbols(formattedSymbols);
   };
 
   const formatGreeks = (greeks: Greeks) => {
@@ -66,11 +100,18 @@ export default function OptionsScannerPage() {
             <div className="flex gap-4 mb-6">
               <Input
                 placeholder="Enter stock symbols (e.g., AAPL, MSFT, GOOGL)"
-                value={symbols}
-                onChange={(e) => setSymbols(e.target.value)}
+                value={symbolInput}
+                onChange={(e) => setSymbolInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch();
+                  }
+                }}
                 className="max-w-xl"
               />
-              <Button onClick={handleSearch}>Search</Button>
+              <Button onClick={handleSearch} disabled={isLoading}>
+                {isLoading ? "Searching..." : "Search"}
+              </Button>
             </div>
 
             <div className="rounded-md border">
@@ -129,10 +170,16 @@ export default function OptionsScannerPage() {
                         </TableCell>
                       </TableRow>
                     ))
+                  ) : searchSymbols ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center">
+                        No options data found for the specified symbols.
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     <TableRow>
                       <TableCell colSpan={11} className="text-center">
-                        No options data available. Enter stock symbols to begin scanning.
+                        Enter stock symbols to begin scanning.
                       </TableCell>
                     </TableRow>
                   )}
