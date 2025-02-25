@@ -50,6 +50,19 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const validatedTrade = insertTradeSchema.parse(req.body);
+      
+      // Calculate metrics for options trades
+      if (validatedTrade.tradeType === 'option') {
+        const roc = calculateROC(validatedTrade);
+        const annualizedROC = calculateAnnualizedROC(validatedTrade);
+        
+        validatedTrade.metadata = {
+          ...validatedTrade.metadata,
+          roc,
+          annualizedROC
+        };
+      }
+      
       const trade = await storage.createTrade(req.user!.id, validatedTrade);
       res.status(201).json(trade);
     } catch (error) {
